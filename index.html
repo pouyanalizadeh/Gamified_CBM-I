@@ -117,14 +117,14 @@
     -webkit-touch-callout:none;
   }
   #shipBtn img{
-    width:100%; height:100%; object-fit:contain; display:block;
-    filter:drop-shadow(0 8px 14px rgba(36,94,121,.18));
-    /* --- FIX 2 (continued) --- */
-    -webkit-user-drag:none;
-    -webkit-touch-callout:none;
-    user-select:none;
-    pointer-events:none; /* all pointer goes to the button, not the image */
-  }
+  width:100%; height:100%; object-fit:contain; display:block;
+  filter:drop-shadow(0 8px 14px rgba(36,94,121,.18));
+
+  pointer-events:none;             /* events go to the button, not image */
+  -webkit-user-drag:none;          /* stop drag ghost */
+  -webkit-touch-callout:none;      /* stop save/share image */
+  user-select:none;
+}
   #shipBtn:active img{transform:translateY(1px) scale(.995)}
 
   /* ===== Hearts ===== */
@@ -360,7 +360,9 @@ const hudTop   = $("#hudTop");
 const hudTimer = $("#hudTimer");
 const hudTries = $("#hudTries");
 const sessionFill = $("#sessionFill");
-const sessionWrap = $("#sessionWrap");  /* for pinned progress bar */
+const sessionWrap = $("#sessionWrap");  /* for pinned progress bar */shipBtn.addEventListener("contextmenu", e => e.preventDefault());  // no long-press menu
+shipBtn.addEventListener("dragstart",  e => e.preventDefault());   // no drag ghost
+shipBtn.addEventListener("selectstart",e => e.preventDefault());   // no text/object selection
 
 /* =============================
    UI helpers
@@ -587,12 +589,14 @@ function stopFiring(){
 }
 function enableShipControls(on){
   shipBtn.style.opacity = on ? "1" : ".6";
+  shipBtn.style.pointerEvents = on ? "auto" : "none";   // <— NEW: hard-disable until enabled
   if (on){
     shipBtn.addEventListener("pointerdown", onPointerDown);
   } else {
     shipBtn.removeEventListener("pointerdown", onPointerDown);
   }
 }
+
 
 /* =============================
    HEARTS (projectiles)
