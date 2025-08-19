@@ -15,6 +15,11 @@
     position: relative;
     width: 100vw;
     height: 100dvh;
+
+    /* Size of the ART itself, preserving the PNG’s 9:19.5 ratio */
+    --artW: min(100vw, calc(100dvh * 9 / 19.5));
+    --artH: min(100dvh, calc(100vw * (19.5 / 9)));
+
     background: url("Main_frame.png") center top / contain no-repeat #fff;
     overflow: hidden;
     touch-action: none;
@@ -164,37 +169,42 @@
     opacity:.9;
   }
 
-  /* ===== Bottom Session Progress ===== */
  /* ===== Bottom Session Progress (phone + laptop consistent) ===== */
-.frame{ position: relative; } /* ensure HUD anchors to the game frame */
+:root{
+    --pb-left: 0.085;           /* 8.5% of art width from art's left edge */
+    --pb-width: 0.83;           /* 83% of art width for the track length   */
+    --pb-topFactor: 0.9263;     /* ~= 92.63% down from the top of the art   */
+    --pb-height: 12px;          /* visual bar height                        */
+  }
 
-.sessionWrap{
-  position:absolute;
-  z-index:30;
-  left:50%;
-  transform:translateX(-50%);
-  bottom: calc(14px + env(safe-area-inset-bottom)); /* iOS safe area padding */
-  width: clamp(280px, 92%, 640px);  /* always inside the frame on any device */
-  height: 12px;                     /* consistent bar height */
-  pointer-events:none;
-}
+  .sessionWrap{
+    position:absolute; z-index:30;
 
-.sessionBar{
-  position:relative;
-  width:100%;
-  height:100%;
-  border-radius:999px;
-  overflow:hidden;
-  background: rgba(106,162,192,.22); /* soft track color */
-}
+    /* Horizontal: art left + inset */
+    left: calc( (100vw - var(--artW)) / 2 + var(--artW) * var(--pb-left) );
 
-.sessionFill{
-  position:absolute; left:0; top:0;
-  height:100%; width:0%;
-  border-radius:inherit;
-  background: linear-gradient(90deg, rgba(115,177,199,.85), rgba(106,162,192,1));
-  transition: width .35s ease;
-}
+    /* Vertical: % of the art height, NOT the viewport height */
+    top: calc( var(--artH) * var(--pb-topFactor) - var(--pb-height) );
+
+    width: calc( var(--artW) * var(--pb-width) );
+    height: var(--pb-height);
+    pointer-events:none;
+  }
+
+  .sessionBar{
+    position:relative;
+    width:100%; height:100%;
+    border-radius:999px; overflow:hidden;
+    background: rgba(106,162,192,.22); /* light track */
+  }
+
+  .sessionFill{
+    position:absolute; left:0; top:0;
+    height:100%; width:0%;
+    border-radius:inherit;
+    background: linear-gradient(90deg, rgba(115,177,199,.85), rgba(106,162,192,1));
+    transition: width .35s ease;
+  }
 
 </style>
 
