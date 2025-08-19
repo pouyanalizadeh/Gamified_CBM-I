@@ -165,36 +165,37 @@
   }
 
   /* ===== Bottom Session Progress ===== */
-  :root{
-    --pb-bottom: 7.37%;
-    --pb-inset-left: 8.5%;
-    --pb-inset-width: 83%;
-    --pb-height: 21px;
-  }
-  .sessionWrap{
-    position:absolute; z-index:30;
-    left:50%; transform:translateX(-50%);
-    bottom: var(--pb-bottom);
-    width: min(560px, 78vw);
-    height: var(--pb-height);
-    pointer-events:none;
-  }
-  .sessionBar{
-    position:relative;
-    width: var(--pb-inset-width);
-    margin-left: var(--pb-inset-left);
-    height:100%;
-    border-radius:999px;
-    overflow:hidden;
-    background:transparent;
-  }
-  .sessionFill{
-    position:absolute; left:0; top:0;
-    height:100%; width:0%;
-    background: linear-gradient(90deg, #73B1C7, #2A5E78);
-    opacity:.85;
-    transition: width .35s ease;
-  }
+ /* ===== Bottom Session Progress (phone + laptop consistent) ===== */
+.frame{ position: relative; } /* ensure HUD anchors to the game frame */
+
+.sessionWrap{
+  position:absolute;
+  z-index:30;
+  left:50%;
+  transform:translateX(-50%);
+  bottom: calc(14px + env(safe-area-inset-bottom)); /* iOS safe area padding */
+  width: clamp(280px, 92%, 640px);  /* always inside the frame on any device */
+  height: 12px;                     /* consistent bar height */
+  pointer-events:none;
+}
+
+.sessionBar{
+  position:relative;
+  width:100%;
+  height:100%;
+  border-radius:999px;
+  overflow:hidden;
+  background: rgba(106,162,192,.22); /* soft track color */
+}
+
+.sessionFill{
+  position:absolute; left:0; top:0;
+  height:100%; width:0%;
+  border-radius:inherit;
+  background: linear-gradient(90deg, rgba(115,177,199,.85), rgba(106,162,192,1));
+  transition: width .35s ease;
+}
+
 </style>
 
 <script defer>
