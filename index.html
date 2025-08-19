@@ -169,35 +169,21 @@
     opacity:.9;
   }
 
- /* ===== Bottom Session Progress (phone + laptop consistent) ===== */
-:root{
-    --pb-left: 0.085;           /* 8.5% of art width from art's left edge */
-    --pb-width: 0.83;           /* 83% of art width for the track length   */
-    --pb-topFactor: 0.9263;     /* ~= 92.63% down from the top of the art   */
-    --pb-height: 12px;          /* visual bar height                        */
-  }
-
+  /* ===== Bottom Session Progress (precisely pinned to art) ===== */
   .sessionWrap{
     position:absolute; z-index:30;
-
-    /* Horizontal: art left + inset */
-    left: calc( (100vw - var(--artW)) / 2 + var(--artW) * var(--pb-left) );
-
-    /* Vertical: % of the art height, NOT the viewport height */
-    top: calc( var(--artH) * var(--pb-topFactor) - var(--pb-height) );
-
-    width: calc( var(--artW) * var(--pb-width) );
-    height: var(--pb-height);
+    /* JS will set left/top/width in pixels */
+    left:0; top:0;
+    width:300px;     /* harmless fallback until JS runs */
+    height:12px;     /* visual bar height */
     pointer-events:none;
   }
-
   .sessionBar{
     position:relative;
     width:100%; height:100%;
     border-radius:999px; overflow:hidden;
-    background: rgba(106,162,192,.22); /* light track */
+    background: rgba(106,162,192,.22); /* track */
   }
-
   .sessionFill{
     position:absolute; left:0; top:0;
     height:100%; width:0%;
@@ -205,7 +191,6 @@
     background: linear-gradient(90deg, rgba(115,177,199,.85), rgba(106,162,192,1));
     transition: width .35s ease;
   }
-
 </style>
 
 <script defer>
@@ -345,6 +330,7 @@ const hudTop   = $("#hudTop");
 const hudTimer = $("#hudTimer");
 const hudTries = $("#hudTries");
 const sessionFill = $("#sessionFill");
+const sessionWrap = $("#sessionWrap");  /* NEW: bar container */
 
 /* =============================
    UI helpers
@@ -364,6 +350,49 @@ function pulseRipple(el){
 function clearHearts(){
   document.querySelectorAll('.heart').forEach(h=>h.remove());
 }
+
+/* ===== ART METRICS & SESSION BAR PINNING (precise) ===== */
+const PB_LEFT  = 0.085;  // 8.5% of art width from the left
+const PB_WIDTH = 0.83;   // 83% of art width
+const PB_TOP   = 0.915;  // ~91.5% down from top (center of holder)
+
+let _artNat = { w: 0, h: 0 };
+
+function _computeArtRect(){
+  const fr = frameEl.getBoundingClientRect();
+  const natW = _artNat.w || 900;   // safe fallback
+  const natH = _artNat.h || 1950;
+  const scale = Math.min(fr.width / natW, fr.height / natH);
+  const artW = natW * scale;
+  const artH = natH * scale;
+  const artLeft = (fr.width - artW) / 2;
+  const artTop  = 0; // background is center top
+  return { artW, artH, artLeft, artTop };
+}
+
+function pinSessionBar(){
+  if (!sessionWrap) return;
+  const fr = frameEl.getBoundingClientRect();
+  const { artW, artH, artLeft, artTop } = _computeArtRect();
+
+  const pxLeft  = fr.left + artLeft + artW * PB_LEFT;
+  const pxTop   = fr.top  + artTop  + artH * PB_TOP;
+
+  // convert to frame-local positioning
+  sessionWrap.style.left  = (pxLeft - fr.left) + "px";
+  sessionWrap.style.top   = (pxTop - fr.top - sessionWrap.offsetHeight/2) + "px";
+  sessionWrap.style.width = (artW * PB_WIDTH) + "px";
+}
+
+const _bg = new Image();
+_bg.src = "Main_frame.png";
+_bg.onload = () => {
+  _artNat.w = _bg.naturalWidth;
+  _artNat.h = _bg.naturalHeight;
+  pinSessionBar();
+};
+window.addEventListener("resize", pinSessionBar);
+window.addEventListener("orientationchange", pinSessionBar);
 
 /* =============================
    TIMER
@@ -675,6 +704,8 @@ function init(){
   stopFiring(); enableShipControls(false);
   startOverlay.style.display="flex";
   updateProgress();
+
+  pinSessionBar();  /* NEW: place bar on load */
 }
 
 startBtn.addEventListener("click", ()=>{
