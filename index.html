@@ -52,15 +52,16 @@
   .target{
     flex:1; min-height:46px;
     display:flex; align-items:center; justify-content:center;
-    padding:10px 12px; text-align:center; white-space:pre-wrap; user-select:none;
+    padding:10px 12px; text-align:center; user-select:none;
     color:#1F4F66; font-weight:700; letter-spacing:.15px; line-height:1.2;
     background:url("Answer_holder.png") center/100% 100% no-repeat;
     border:none; border-radius:999px;
     filter:drop-shadow(0 6px 10px rgba(36,94,121,.08));
     font-size: clamp(13px, 2.3vw, 16px);
     transition: transform .18s ease, filter .18s ease, box-shadow .18s ease;
-    word-break:break-word;
-    hyphens:auto;
+    /* --- FIX 1: keep chips to one line and let JS shrink if needed --- */
+    white-space: nowrap;
+    overflow: hidden;
   }
   .target .slot{ min-width:.6em; font-weight:800 }
 
@@ -112,9 +113,18 @@
     bottom:0; pointer-events:auto; touch-action:none; user-select:none; cursor:pointer;
     background:transparent; border:0; padding:0; width:96px; height:96px;
     will-change:left;
+    /* --- FIX 2: block iOS callout/selection on long press --- */
+    -webkit-touch-callout:none;
   }
-  #shipBtn img{width:100%; height:100%; object-fit:contain; display:block;
-    filter:drop-shadow(0 8px 14px rgba(36,94,121,.18));}
+  #shipBtn img{
+    width:100%; height:100%; object-fit:contain; display:block;
+    filter:drop-shadow(0 8px 14px rgba(36,94,121,.18));
+    /* --- FIX 2 (continued) --- */
+    -webkit-user-drag:none;
+    -webkit-touch-callout:none;
+    user-select:none;
+    pointer-events:none; /* all pointer goes to the button, not the image */
+  }
   #shipBtn:active img{transform:translateY(1px) scale(.995)}
 
   /* ===== Hearts ===== */
@@ -226,6 +236,26 @@ function fitTextTo(el, minPx=12, step=1){
   }
 }
 
+/* --- FIX 1 helper: shrink chip text until it fits one line --- */
+function fitToOneLine(el, minPx=11, step=0.5){
+  el.style.fontSize = "";                 // reset to CSS-defined size
+  const cs = getComputedStyle(el);
+  let size = parseFloat(cs.fontSize) || 16;
+  const maxLoops = 40; let loops = 0;
+  // Keep to a single line; reduce size while overflowing horizontally
+  while ((el.scrollWidth > el.clientWidth) && size > minPx && loops < maxLoops){
+    size -= step;
+    el.style.fontSize = size + "px";
+    loops++;
+  }
+}
+function fitTargetsToOneLine(){
+  const L = document.getElementById('leftBox');
+  const R = document.getElementById('rightBox');
+  if (L) fitToOneLine(L);
+  if (R) fitToOneLine(R);
+}
+
 function obfuscateOneLetter(word){
   const idxs=[]; for(let i=0;i<word.length;i++){ if(lettersOnly.test(word[i])) idxs.push(i); }
   const pick = idxs[Math.floor(Math.random()*idxs.length)];
@@ -330,7 +360,7 @@ const hudTop   = $("#hudTop");
 const hudTimer = $("#hudTimer");
 const hudTries = $("#hudTries");
 const sessionFill = $("#sessionFill");
-const sessionWrap = $("#sessionWrap");  /* NEW: bar container */
+const sessionWrap = $("#sessionWrap");  /* for pinned progress bar */
 
 /* =============================
    UI helpers
@@ -433,6 +463,7 @@ function startAttempt(isFirst){
       hudTop.style.opacity = "1";
       startAnswerWindow(ATTEMPT_SECONDS,()=>registerFailAttempt("timeout"));
       enableShipControls(true);
+      fitTargetsToOneLine(); /* ensure chips fit when first shown */
     }, FIRST_DELAY_MS);
   } else {
     targetsEl.style.visibility = "visible";
@@ -440,6 +471,7 @@ function startAttempt(isFirst){
     toggleShake(true);
     startAnswerWindow(ATTEMPT_SECONDS,()=>registerFailAttempt("timeout"));
     enableShipControls(true);
+    fitTargetsToOneLine();
   }
 }
 
@@ -471,6 +503,7 @@ function showTrial(sc){
   leftBox.innerHTML  = posOnLeft ? posHTML : blankHTML;
   rightBox.innerHTML = posOnLeft ? blankHTML : posHTML;
 
+  fitTargetsToOneLine();  /* --- FIX 1: shrink to one line --- */
   startAttempt(true);
   updateProgress();
 }
@@ -526,6 +559,10 @@ function onPointerUp(){
   stopFiring();
   window.removeEventListener("pointermove", onPointerMove);
 }
+
+/* --- FIX 2: block drag/callout/context menu on the ship --- */
+shipBtn.addEventListener("contextmenu", e => e.preventDefault());
+shipBtn.addEventListener("dragstart",  e => e.preventDefault());
 
 function startFiring(){
   if (firing || !trialActive || seconds <= 0) return;
@@ -670,6 +707,8 @@ function onCorrect(){
     .replace(";", ";<br>");
   fitTextTo(sceneEl);
 
+  fitToOneLine(posEl); /* --- FIX 1: ensure revealed positive fits --- */
+
   successMsg.textContent = makeReinforcementLine(sc.scenario, sc.positive);
   successOverlay.style.display="flex";
 }
@@ -705,7 +744,8 @@ function init(){
   startOverlay.style.display="flex";
   updateProgress();
 
-  pinSessionBar();  /* NEW: place bar on load */
+  pinSessionBar();  /* place bar on load */
+  fitTargetsToOneLine();
 }
 
 startBtn.addEventListener("click", ()=>{
@@ -732,6 +772,10 @@ restartSessionBtn && restartSessionBtn.addEventListener("click", ()=>{
   idx=0;
   init();
 });
+
+/* Keep chips fitting on rotate/resize */
+window.addEventListener("resize", fitTargetsToOneLine);
+window.addEventListener("orientationchange", fitTargetsToOneLine);
 
 /* boot */
 init();
@@ -762,7 +806,7 @@ init();
 
     <div class="ship-wrap" id="shipWrap" style="z-index:6;">
       <button id="shipBtn" aria-label="Hold to fire hearts">
-        <img src="Ship_to_shoot.png" alt="">
+        <img src="Ship_to_shoot.png" alt="" draggable="false">
       </button>
     </div>
 
