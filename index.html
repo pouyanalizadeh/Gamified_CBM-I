@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>IB Training — Visual Skin</title>
+
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%; margin:0}
+  body{background:#fff;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; overflow:hidden}
+
+  /* ===== Stage / Background ===== */
+  .frame{
+    position: relative;
+    width: 100vw;
+    height: 100dvh;
+    background: url("Main_frame.png") center top / contain no-repeat #fff;
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  .scene,.targets,.ship-wrap,#startOverlay,#bigRetry,#successOverlay,#overlay{position:absolute; z-index:5}
+  .bar{display:none}
+
+  /* ===== Scenario card ===== */
+  .scene{
+    left:50%; transform:translateX(-50%);
+    width:min(560px,78vw);
+    top:16%; height:14%;
+    display:flex; align-items:center; justify-content:center;
+    padding:12px 14px; text-align:center; white-space:pre-wrap;
+    color:#2A5E78; font-weight:600; letter-spacing:.1px;
+    font-size: clamp(14px, 2.5vw, 18px);
+    line-height: 1.25;
+    overflow:hidden;
+    word-break:break-word;
+    hyphens:auto;
+  }
+
+  /* ===== Targets ===== */
+  .targets{
+    left:50%; transform:translateX(-50%); width:min(560px,78vw);
+    top:38.5%; display:flex; gap:12px; justify-content:space-between;
+    visibility:visible;
+  }
+  .target{
+    flex:1; min-height:46px;
+    display:flex; align-items:center; justify-content:center;
+    padding:10px 12px; text-align:center; white-space:pre-wrap; user-select:none;
+    color:#1F4F66; font-weight:700; letter-spacing:.15px; line-height:1.2;
+    background:url("Answer_holder.png") center/100% 100% no-repeat;
+    border:none; border-radius:999px;
+    filter:drop-shadow(0 6px 10px rgba(36,94,121,.08));
+    font-size: clamp(13px, 2.3vw, 16px);
+    transition: transform .18s ease, filter .18s ease, box-shadow .18s ease;
+    word-break:break-word;
+    hyphens:auto;
+  }
+  .target .slot{ min-width:.6em; font-weight:800 }
+
+  @keyframes gentleShake{
+    0%{transform:translate(0,0) rotate(0)}
+    20%{transform:translate(1px,-1px) rotate(-.35deg)}
+    40%{transform:translate(-1px,.6px) rotate(.35deg)}
+    60%{transform:translate(.6px,1px) rotate(-.25deg)}
+    80%{transform:translate(-.6px,-1px) rotate(.25deg)}
+    100%{transform:translate(0,0) rotate(0)}
+  }
+  .target.shake{animation:gentleShake .65s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){.target.shake{animation:none}}
+
+  .target.goodflash{animation:good 300ms ease}
+  .target.badflash{animation:bad 300ms ease}
+  @keyframes good{from{outline:2px solid #2bb; filter:brightness(1.05)} to{outline:0}}
+  @keyframes bad {from{outline:2px solid #b66; filter:contrast(1.03)} to{outline:0}}
+  @keyframes reinforcePop {0%{transform:scale(1)}40%{transform:scale(1.03)}100%{transform:scale(1)}}
+  .target.reinforce{animation:reinforcePop 280ms ease}
+
+  .target.aim{
+    transform: translateZ(0) scale(1.015);
+    box-shadow:
+      0 6px 10px rgba(36,94,121,.08),
+      0 0 0 2px rgba(115,177,199,.25) inset,
+      0 0 20px rgba(115,177,199,.12);
+  }
+  @keyframes targetRipple {from{box-shadow:0 0 0 0 rgba(115,177,199,.28)} to{box-shadow:0 0 0 12px rgba(115,177,199,0)}}
+  .target.ripple{animation: targetRipple 320ms ease-out}
+
+  /* ===== Start overlay ===== */
+  #startOverlay{
+    inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.10); z-index:100;
+    pointer-events:auto;
+  }
+  .btn{
+    border:1px solid #73B1C7; background:#fff; color:#1F4F66;
+    font-weight:800; padding:12px 24px; border-radius:12px; cursor:pointer;
+    box-shadow:0 10px 24px rgba(0,0,0,.12);
+  }
+
+  /* ===== Ship ===== */
+  .ship-wrap{ left:0; right:0; bottom:25%; height:90px; z-index:8 }
+  #shipBtn{
+    position:absolute;
+    left:50%; transform:translateX(-50%);
+    bottom:0; pointer-events:auto; touch-action:none; user-select:none; cursor:pointer;
+    background:transparent; border:0; padding:0; width:96px; height:96px;
+    will-change:left;
+  }
+  #shipBtn img{width:100%; height:100%; object-fit:contain; display:block;
+    filter:drop-shadow(0 8px 14px rgba(36,94,121,.18));}
+  #shipBtn:active img{transform:translateY(1px) scale(.995)}
+
+  /* ===== Hearts ===== */
+  .heart{position:absolute; left:0; top:0; transform:translate(-50%,-50%); font-size:18px; pointer-events:none; user-select:none; z-index:999}
+  .heart.letter{font-size:28px; text-shadow:0 0 1px rgba(0,0,0,.45)}
+  .heart.letter .letterglyph{
+    display:inline-block; margin-left:4px; padding:2px 7px; border-radius:999px;
+    border:1px solid rgba(31,79,102,.7); background:#fff; font-weight:800; font-size:20px; line-height:1;
+    box-shadow:0 1px 2px rgba(0,0,0,.2)
+  }
+
+  /* ===== Overlays ===== */
+  #bigRetry,#successOverlay,#overlay{
+    inset:0; display:none; align-items:center; justify-content:center; z-index:90;
+    background:rgba(255,255,255,.88);
+  }
+  #bigRetry .msg{
+    font-weight:900; font-size:clamp(28px,7vw,56px);
+    padding:18px 28px; border-radius:12px; border:2px dashed #7FB5C9; color:#1F4F66; background:#fff;
+    box-shadow:0 10px 28px rgba(0,0,0,.18)
+  }
+  #successOverlay .panel,#overlay .panel{
+    max-width:86%; border:1px dashed #7FB5C9; border-radius:12px; padding:16px; background:#fff; text-align:center;
+    color:#1F4F66; box-shadow:0 10px 28px rgba(0,0,0,.18)
+  }
+
+  .hidden{display:none}
+  .slot{display:inline-block; min-width:.7em; text-align:center}
+  @keyframes slotPulse{0%{opacity:.8}50%{opacity:1}100%{opacity:.8}}
+  .slot.pulse{animation:slotPulse 700ms ease-in-out infinite}
+
+  /* ===== Top HUD (Timer + Tries) ===== */
+  .hudTop{
+    position:absolute; z-index:20;
+    top:10px; left:50%; transform:translateX(-50%);
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    pointer-events:none;
+    transition: opacity .15s ease;
+  }
+  .hudTimer{
+    font-weight:900;
+    font-size: clamp(24px, 6.5vw, 36px);
+    line-height:1;
+    color:#1F4F66;
+    text-shadow:0 2px 10px rgba(31,79,102,.15);
+  }
+  .hudTries{
+    font-weight:700;
+    font-size: clamp(12px, 2.8vw, 14px);
+    line-height:1;
+    color:#2A5E78;
+    opacity:.9;
+  }
+
+  /* ===== Bottom Session Progress ===== */
+  :root{
+    --pb-bottom: 7.37%;
+    --pb-inset-left: 8.5%;
+    --pb-inset-width: 83%;
+    --pb-height: 21px;
+  }
+  .sessionWrap{
+    position:absolute; z-index:30;
+    left:50%; transform:translateX(-50%);
+    bottom: var(--pb-bottom);
+    width: min(560px, 78vw);
+    height: var(--pb-height);
+    pointer-events:none;
+  }
+  .sessionBar{
+    position:relative;
+    width: var(--pb-inset-width);
+    margin-left: var(--pb-inset-left);
+    height:100%;
+    border-radius:999px;
+    overflow:hidden;
+    background:transparent;
+  }
+  .sessionFill{
+    position:absolute; left:0; top:0;
+    height:100%; width:0%;
+    background: linear-gradient(90deg, #73B1C7, #2A5E78);
+    opacity:.85;
+    transition: width .35s ease;
+  }
+</style>
+
+<script defer>
+window.addEventListener('DOMContentLoaded', () => {
+/* =============================
+   CONSTANTS
+============================= */
+const HEART_INTERVAL_MS = 700;
+const LETTER_INTERVAL_MS = 360;
+const HEART_SPEED_MS    = 420;
+const LETTER_SPEED_MS   = 1100;
+const ATTEMPT_SECONDS   = 10;
+const RETRY_OVERLAY_MS  = 1200;
+const FIRST_DELAY_MS    = 3000;
+
+/* =============================
+   HELPERS
+============================= */
+const $ = (s)=>document.querySelector(s);
+const shuffle = (a)=>{ const x=a.slice(); for(let i=x.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [x[i],x[j]]=[x[j],x[i]];} return x; };
+const lettersOnly = /[A-Za-zÀ-ÖØ-öø-ÿ]/;
+
+function fitTextTo(el, minPx=12, step=1){
+  const cs = getComputedStyle(el);
+  let size = parseFloat(cs.fontSize);
+  const lineH = parseFloat(cs.lineHeight) || 1.25 * size;
+  const maxLoops = 12; let loops=0;
+  while (el.scrollHeight > el.clientHeight && size > minPx && loops < maxLoops){
+    size = Math.max(minPx, size - step);
+    el.style.fontSize = size + "px";
+    el.style.lineHeight = Math.max(1.15, (size/lineH)*1.25);
+    loops++;
+  }
+}
+
+function obfuscateOneLetter(word){
+  const idxs=[]; for(let i=0;i<word.length;i++){ if(lettersOnly.test(word[i])) idxs.push(i); }
+  const pick = idxs[Math.floor(Math.random()*idxs.length)];
+  const missingChar = word[pick];
+  const masked = word.substring(0,pick)+"_"+word.substring(pick+1);
+  return { masked, missingChar, index: pick };
+}
+function decorateMasked(masked){ return masked.replace("_",'<span class="slot pulse">_</span>'); }
+function makeReinforcementLine(s,positive){
+  const cut=s.split(";")[0].trim();
+  let phrase=cut;
+  const i=phrase.toLowerCase().indexOf("your partner ");
+  if(i>=0) phrase="your partner "+phrase.slice(i+"your partner ".length);
+  phrase=phrase.replace(/[.?!]\s*$/,"");
+  return `the reason ${phrase} was ${positive}.`;
+}
+
+/* =============================
+   SCENARIOS
+============================= */
+const SCENARIOS=[/* (unchanged 32 scenarios) */ 
+{"id":"S01","scenario":"After emails, your partner rubs their eyes and squints at the screen; you tell yourself it’s ______.","positive":"eye strain","negative":"migraine onset"},
+{"id":"S02","scenario":"On a chilly walk, they cough a few times and clear their throat; maybe it’s ______.","positive":"dry air","negative":"chest cold"},
+{"id":"S03","scenario":"Their smartwatch flags heart rate while resting; you think it’s ______.","positive":"device glitch","negative":"heart arrhythmia"},
+{"id":"S04","scenario":"A clinic voicemail asks for a call back without details; probably ______.","positive":"routine reminder","negative":"abnormal results"},
+{"id":"S05","scenario":"They cancel tonight with a small heart emoji; perhaps ______.","positive":"simple tiredness","negative":"pain flare"},
+{"id":"S06","scenario":"Standing up, they wince and hold a knee; maybe ______.","positive":"brief stiffness","negative":"joint inflammation"},
+{"id":"S07","scenario":"They read a doctor-portal message silently, face blank; likely ______.","positive":"appointment confirmation","negative":"medical concern"},
+{"id":"S08","scenario":"They ask you to repeat twice, gaze drifting; maybe ______.","positive":"mild distraction","negative":"brain fog"},
+{"id":"S09","scenario":"After one flight of stairs, they breathe fast; could be ______.","positive":"normal exertion","negative":"asthma flare"},
+{"id":"S10","scenario":"Halfway through dinner, they push the plate away; you guess ______.","positive":"early snack","negative":"nausea wave"},
+{"id":"S11","scenario":"Afternoon, they nap with a short timer; it’s probably ______.","positive":"quick recharge","negative":"persistent fatigue"},
+{"id":"S12","scenario":"After spicy food, they press the chest briefly; maybe ______.","positive":"simple heartburn","negative":"chest pain"},
+{"id":"S13","scenario":"Up at night to pee, then restless; perhaps ______.","positive":"extra hydration","negative":"urinary infection"},
+{"id":"S14","scenario":"They misplace keys again and laugh; you think ______.","positive":"mental overload","negative":"memory decline"},
+{"id":"S15","scenario":"They dim bright lights and rub temples; likely ______.","positive":"light preference","negative":"migraine sensitivity"},
+{"id":"S16","scenario":"On a call, they keep clearing their throat; maybe ______.","positive":"dry throat","negative":"acid reflux"},
+{"id":"S17","scenario":"After lifting a bag, they hold lower back; feels like ______.","positive":"minor strain","negative":"back injury"},
+{"id":"S18","scenario":"Your supportive text gets “Can we talk later?”; probably ______.","positive":"work busyness","negative":"emotional distress"},
+{"id":"S19","scenario":"They chew slowly and touch the jaw; maybe ______.","positive":"spice irritation","negative":"jaw pain"},
+{"id":"S20","scenario":"They grip the stair rail briefly before stepping; perhaps ______.","positive":"extra caution","negative":"sudden dizziness"},
+{"id":"S21","scenario":"Sitting after a big meal, they press the belly; could be ______.","positive":"tight clothing","negative":"abdominal cramping"},
+{"id":"S22","scenario":"They sit on the shower floor for a minute; maybe ______.","positive":"deep relaxation","negative":"near fainting"},
+{"id":"S23","scenario":"They cancel a walk when clouds gather; you think ______.","positive":"light drizzle","negative":"symptom flare"},
+{"id":"S24","scenario":"They reach for pain pills, then put them back; perhaps ______.","positive":"testing restraint","negative":"worsening pain"},
+{"id":"S25","scenario":"Mid-story, they pause to find a word; likely ______.","positive":"momentary pause","negative":"cognitive slowdown"},
+{"id":"S26","scenario":"After a long drive, they rub one calf; maybe ______.","positive":"travel stiffness","negative":"blood clot"},
+{"id":"S27","scenario":"They retake a home blood-pressure reading; perhaps ______.","positive":"simple curiosity","negative":"elevated pressure"},
+{"id":"S28","scenario":"They skip game night and go quiet; could be ______.","positive":"needed downtime","negative":"social anxiety"},
+{"id":"S29","scenario":"At the store, they study food labels; you think ______.","positive":"budget planning","negative":"medical restriction"},
+{"id":"S30","scenario":"Standing up, they steady on the table for a moment; maybe ______.","positive":"gentle stretch","negative":"lightheaded spell"},
+{"id":"S31","scenario":"Your long text gets a quick “k”; probably ______.","positive":"busy multitasking","negative":"hidden irritation"},
+{"id":"S32","scenario":"Walking in dim light, they touch the wall; maybe ______.","positive":"casual stretch","negative":"balance trouble"}
+];
+
+/* =============================
+   STATE & ELEMENTS
+============================= */
+let order = [];
+let idx = 0;
+let seconds = 0;
+let timerId = null;
+let trialActive = false;
+let attempts = 0;
+let posSide = "L";
+let missing = { masked:"", missingChar:"", index:-1 };
+let firing = false, fireTimer = null, letterTimer = null, currentSide = "L";
+let firstDelayTO = null;
+
+/* NEW: token to invalidate hearts from previous trials */
+let currentTrialToken = 0;
+
+const frameEl   = $("#frame"),
+      sceneEl   = $("#scene"),
+      targetsEl = document.querySelector(".targets"),
+      leftBox   = $("#leftBox"),
+      rightBox  = $("#rightBox");
+
+const attemptEl = $("#attempt"),
+      timerEl   = $("#timer"),
+      scoreEl   = $("#score"),
+      trialIdxEl= $("#trialIdx"),
+      trialTotalEl=$("#trialTotal");
+
+const overlay   = $("#overlay"),
+      ovTitle   = $("#ovTitle"),
+      ovMsg     = $("#ovMsg"),
+      bigRetry  = $("#bigRetry"),
+      bigRetryMsg=$("#bigRetryMsg"),
+      successOverlay = $("#successOverlay"),
+      successMsg = $("#successMsg"),
+      continueBtn = $("#continueBtn"),
+      restartBtn  = $("#restartBtn"),
+      retryScenarioBtn = $("#retryScenarioBtn"),
+      restartSessionBtn = $("#restartSessionBtn"),
+      startOverlay = $("#startOverlay"),
+      startBtn = $("#startBtn"),
+      shipBtn = $("#shipBtn");
+
+/* HUD */
+const hudTop   = $("#hudTop");
+const hudTimer = $("#hudTimer");
+const hudTries = $("#hudTries");
+const sessionFill = $("#sessionFill");
+
+/* =============================
+   UI helpers
+============================= */
+let aimSide = null;
+function setAim(side){
+  if (aimSide === side) return;
+  [leftBox, rightBox].forEach(el => el.classList.remove('aim'));
+  (side === "L" ? leftBox : rightBox).classList.add('aim');
+  aimSide = side;
+}
+function pulseRipple(el){
+  el.classList.remove('ripple');
+  void el.offsetWidth;
+  el.classList.add('ripple');
+}
+function clearHearts(){
+  document.querySelectorAll('.heart').forEach(h=>h.remove());
+}
+
+/* =============================
+   TIMER
+============================= */
+function startAnswerWindow(limit,onEnd){
+  clearInterval(timerId);
+  seconds = limit;
+  timerEl && (timerEl.textContent = String(seconds));
+  hudTimer && (hudTimer.textContent = String(seconds));
+  timerId = setInterval(()=>{
+    seconds -= 1;
+    const s = String(Math.max(0,seconds));
+    timerEl && (timerEl.textContent = s);
+    hudTimer && (hudTimer.textContent = s);
+    if (seconds <= 0){
+      clearInterval(timerId);
+      onEnd();
+    }
+  },1000);
+}
+
+/* =============================
+   ATTEMPTS
+============================= */
+function startAttempt(isFirst){
+  stopFiring(); enableShipControls(false);
+  clearInterval(timerId);
+  clearHearts(); // ensure a clean attempt (safety)
+
+  if (isFirst){
+    targetsEl.style.visibility = "hidden";
+    hudTop.style.opacity = "0";
+    toggleShake(false);
+    clearTimeout(firstDelayTO);
+    firstDelayTO = setTimeout(()=>{
+      targetsEl.style.visibility = "visible";
+      leftBox.classList.add("shake"); rightBox.classList.add("shake");
+      hudTop.style.opacity = "1";
+      startAnswerWindow(ATTEMPT_SECONDS,()=>registerFailAttempt("timeout"));
+      enableShipControls(true);
+    }, FIRST_DELAY_MS);
+  } else {
+    targetsEl.style.visibility = "visible";
+    hudTop.style.opacity = "1";
+    toggleShake(true);
+    startAnswerWindow(ATTEMPT_SECONDS,()=>registerFailAttempt("timeout"));
+    enableShipControls(true);
+  }
+}
+
+/* =============================
+   TRIAL FLOW
+============================= */
+function showTrial(sc){
+  // NEW: move to a fresh trial token and purge any stray hearts
+  currentTrialToken++;
+  clearHearts();
+
+  trialActive=true; attempts=0;
+  attemptEl && (attemptEl.textContent="0");
+  hudTries && (hudTries.textContent = "0/3");
+  sceneEl.style.fontSize = ""; sceneEl.style.lineHeight = "";
+  sceneEl.innerHTML = sc.scenario.replace(";", ";<br>");
+  fitTextTo(sceneEl);
+
+  leftBox.className="target";
+  rightBox.className="target";
+
+  const posOnLeft=Math.random()<0.5; posSide=posOnLeft?"L":"R";
+  leftBox.dataset.correct=posOnLeft?"1":"0";
+  rightBox.dataset.correct=posOnLeft?"0":"1";
+
+  missing=obfuscateOneLetter(sc.positive);
+  const posHTML=`[ ${decorateMasked(missing.masked)} ]`;
+  const blankHTML="[ — — ]";
+  leftBox.innerHTML  = posOnLeft ? posHTML : blankHTML;
+  rightBox.innerHTML = posOnLeft ? blankHTML : posHTML;
+
+  startAttempt(true);
+  updateProgress();
+}
+
+function nextTrial(){
+  bigRetry.style.display="none";
+  successOverlay.style.display="none";
+  overlay.style.display="none";
+  clearTimeout(firstDelayTO);
+  clearHearts(); // NEW: ensure no carry-over before moving on
+
+  if (idx >= order.length){
+    ovTitle.textContent = "Session Complete";
+    ovMsg.innerHTML = "Well done! You’ve finished all scenarios in this session.";
+    overlay.style.display = "flex";
+    retryScenarioBtn && (retryScenarioBtn.style.display = "none");
+    return;
+  }
+  showTrial(SCENARIOS[order[idx]]);
+}
+
+/* =============================
+   SHIP & FIRING
+============================= */
+function setShipX(docX){
+  const fr = frameEl.getBoundingClientRect();
+  const half = shipBtn.offsetWidth / 2;
+  const minX = fr.left + 20 + half;
+  const maxX = fr.right - 20 - half;
+  const clamped = Math.min(Math.max(docX, minX), maxX);
+  shipBtn.style.left = (clamped - fr.left - half) + "px";
+}
+function updateSide(clientX){
+  const fr = frameEl.getBoundingClientRect();
+  currentSide = (clientX < fr.left + fr.width/2) ? "L" : "R";
+  setAim(currentSide);
+}
+function onPointerDown(e){
+  if (!trialActive || seconds <= 0) return;
+  e.preventDefault();
+  setShipX(e.clientX);
+  updateSide(e.clientX);
+  startFiring();
+  window.addEventListener("pointermove", onPointerMove, {passive:false});
+  window.addEventListener("pointerup", onPointerUp, {once:true});
+  window.addEventListener("pointercancel", onPointerUp, {once:true});
+}
+function onPointerMove(e){
+  setShipX(e.clientX);
+  updateSide(e.clientX);
+}
+function onPointerUp(){
+  stopFiring();
+  window.removeEventListener("pointermove", onPointerMove);
+}
+
+function startFiring(){
+  if (firing || !trialActive || seconds <= 0) return;
+  firing = true;
+  fireTimer   = setInterval(()=>emitHeart(currentSide,false), HEART_INTERVAL_MS);
+  startLetterTimer();
+}
+function startLetterTimer(){
+  if (letterTimer) return;
+  letterTimer = setInterval(()=>{
+    if (!trialActive || seconds <= 0) return;
+    if (currentSide === posSide){
+      emitHeart(currentSide, true);
+      if (navigator.vibrate){ try{ navigator.vibrate(12); }catch(e){} }
+    }
+  }, LETTER_INTERVAL_MS);
+}
+function stopFiring(){
+  firing=false;
+  clearInterval(fireTimer); fireTimer=null;
+  clearInterval(letterTimer); letterTimer=null;
+}
+function enableShipControls(on){
+  shipBtn.style.opacity = on ? "1" : ".6";
+  if (on){
+    shipBtn.addEventListener("pointerdown", onPointerDown);
+  } else {
+    shipBtn.removeEventListener("pointerdown", onPointerDown);
+  }
+}
+
+/* =============================
+   HEARTS (projectiles)
+============================= */
+function emitHeart(side,isLetter){
+  // NEW: capture the emitting trial
+  const myToken = currentTrialToken;
+
+  const fr=frameEl.getBoundingClientRect();
+  const shipRect=shipBtn.getBoundingClientRect();
+  const startX=shipRect.left+shipRect.width/2-fr.left;
+  const startY=shipRect.top+shipRect.height/2-fr.top;
+
+  const targetEl=(side==="L")?leftBox:rightBox;
+  const tRect=targetEl.getBoundingClientRect();
+  const endX=tRect.left+tRect.width/2-fr.left;
+  const endY=tRect.top+tRect.height/2-fr.top;
+
+  const heart=document.createElement("div");
+  heart.className="heart"+(isLetter?" letter":"");
+  heart.innerHTML=isLetter?`❤<span class="letterglyph">${missing.missingChar}</span>`:"❤";
+  frameEl.appendChild(heart);
+
+  const dur=isLetter?LETTER_SPEED_MS:HEART_SPEED_MS;
+  const t0=performance.now();
+  function step(t){
+    // If trial changed mid-flight, discard this heart
+    if (myToken !== currentTrialToken){ heart.remove(); return; }
+
+    const p=Math.min(1,(t-t0)/dur);
+    heart.style.left=(startX+(endX-startX)*p)+"px";
+    heart.style.top =(startY+(endY-startY)*p)+"px";
+    if(p<1){
+      requestAnimationFrame(step);
+    } else {
+      // Guard again at landing
+      if(myToken !== currentTrialToken || !trialActive || seconds <= 0){ heart.remove(); return; }
+
+      pulseRipple(targetEl);
+      const good = targetEl.dataset.correct==="1";
+      targetEl.classList.remove("goodflash","badflash");
+      targetEl.classList.add(good?"goodflash":"badflash");
+      setTimeout(()=>targetEl.classList.remove("goodflash","badflash"),260);
+
+      if (good && isLetter){
+        onCorrect();
+      }
+      heart.remove();
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+/* =============================
+   FEEDBACK / OVERLAYS
+============================= */
+function toggleShake(on){
+  for(const el of [leftBox,rightBox]){
+    el.classList.remove("shake");
+    if(on) el.classList.add("shake");
+  }
+}
+function registerFailAttempt(kind){
+  if(!trialActive) return;
+
+  stopFiring(); enableShipControls(false);
+  clearTimeout(firstDelayTO);
+  clearHearts();
+
+  if(kind==="timeout"){
+    attempts += 1;
+    hudTries && (hudTries.textContent = Math.min(attempts,3) + "/3");
+
+    if (attempts >= 3){
+      trialActive=false; clearInterval(timerId); toggleShake(false);
+      overlay.style.display="flex";
+      ovTitle.textContent = "Session Restart Needed";
+      ovMsg.innerHTML = `You need to start over from the beginning.`;
+      retryScenarioBtn && (retryScenarioBtn.style.display = "none");
+      return;
+    } else {
+      bigRetryMsg.textContent = "Time is over, lets try again.";
+      bigRetry.style.display = "flex";
+      setTimeout(()=>{
+        bigRetry.style.display = "none";
+        startAttempt(false);
+      }, RETRY_OVERLAY_MS);
+      return;
+    }
+  }
+}
+
+function onCorrect(){
+  if(!trialActive || seconds <= 0) return;
+  trialActive=false;
+  enableShipControls(false);
+  stopFiring();
+  clearInterval(timerId);
+  toggleShake(false);
+  clearTimeout(firstDelayTO);
+
+  clearHearts(); // NEW: purge any in-flight hearts immediately
+
+  const sc=SCENARIOS[order[idx]];
+  const posEl=(posSide==="L")?leftBox:rightBox;
+  posEl.innerHTML=`[ ${sc.positive} ]`;
+  posEl.classList.add("reinforce");
+  setTimeout(()=>posEl.classList.remove("reinforce"),300);
+
+  sceneEl.innerHTML = sc.scenario
+    .replace(/______/, sc.positive)
+    .replace(";", ";<br>");
+  fitTextTo(sceneEl);
+
+  successMsg.textContent = makeReinforcementLine(sc.scenario, sc.positive);
+  successOverlay.style.display="flex";
+}
+
+/* =============================
+   PROGRESS
+============================= */
+function updateProgress(){
+  if (!sessionFill || !order.length) return;
+  const pct = Math.round((idx / order.length) * 100);
+  sessionFill.style.width = pct + "%";
+}
+
+/* =============================
+   INIT & BUTTONS
+============================= */
+function init(){
+  order = shuffle(SCENARIOS.map((_,i)=>i));
+  idx=0; trialActive=false; attempts=0;
+  clearTimeout(firstDelayTO);
+  currentTrialToken++; // NEW: invalidate anything stale on init
+  clearHearts();
+
+  sceneEl.textContent="Press “Start” to begin.";
+  sceneEl.style.fontSize=""; sceneEl.style.lineHeight="";
+  leftBox.textContent="[ — — ]";
+  rightBox.textContent="[ — — ]";
+  hudTries && (hudTries.textContent = "0/3");
+  hudTimer && (hudTimer.textContent = "10");
+  hudTop.style.opacity = "1";
+  targetsEl.style.visibility = "visible";
+  stopFiring(); enableShipControls(false);
+  startOverlay.style.display="flex";
+  updateProgress();
+}
+
+startBtn.addEventListener("click", ()=>{
+  startOverlay.style.display="none";
+  nextTrial();
+});
+
+frameEl.addEventListener("click", ()=>{
+  if (startOverlay.style.display!=="none"){
+    startOverlay.style.display="none";
+    nextTrial();
+  }
+});
+
+continueBtn.addEventListener("click", ()=>{
+  successOverlay.style.display="none";
+  idx += 1;
+  updateProgress();
+  nextTrial();
+});
+
+retryScenarioBtn && retryScenarioBtn.addEventListener("click", ()=>{});
+restartSessionBtn && restartSessionBtn.addEventListener("click", ()=>{
+  idx=0;
+  init();
+});
+
+/* boot */
+init();
+});
+</script>
+</head>
+
+<body>
+  <div class="frame" id="frame">
+
+    <div id="startOverlay">
+      <button id="startBtn" class="btn">Start</button>
+    </div>
+
+    <div class="hudTop" id="hudTop">
+      <div class="hudTimer" id="hudTimer">10</div>
+      <div class="hudTries" id="hudTries">0/3</div>
+    </div>
+
+    <div class="scene" id="scene">Press “Start” to begin.</div>
+
+    <div class="targets">
+      <div class="target" id="leftBox">[ — — ]</div>
+      <div class="target" id="rightBox">[ — — ]</div>
+    </div>
+
+    <button id="restartBtn" style="position:absolute; left:-9999px; top:-9999px;" disabled>Restart</button>
+
+    <div class="ship-wrap" id="shipWrap" style="z-index:6;">
+      <button id="shipBtn" aria-label="Hold to fire hearts">
+        <img src="Ship_to_shoot.png" alt="">
+      </button>
+    </div>
+
+    <div class="sessionWrap" id="sessionWrap" aria-label="Session progress">
+      <div class="sessionBar">
+        <div class="sessionFill" id="sessionFill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div id="bigRetry"><div class="msg" id="bigRetryMsg">Time is over, lets try again.</div></div>
+
+    <div id="successOverlay" role="dialog" aria-modal="true">
+      <div class="panel">
+        <h2 style="margin:0 0 6px">Nice!</h2>
+        <p id="successMsg" style="margin:6px 0 12px">the reason your partner … was …</p>
+        <button id="continueBtn" class="btn" style="padding:8px 14px">Continue</button>
+      </div>
+    </div>
+
+    <div id="overlay" role="dialog" aria-modal="true">
+      <div class="panel">
+        <h2 id="ovTitle" style="margin:0 0 6px">Session Restart Needed</h2>
+        <p id="ovMsg" style="margin:6px 0 12px"></p>
+        <div style="display:flex; gap:8px; justify-content:center; margin-top:8px;">
+          <button id="retryScenarioBtn" class="btn" style="padding:8px 12px">Play This Scenario Again</button>
+          <button id="restartSessionBtn" class="btn" style="padding:8px 12px">Restart Session</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="results" class="hidden">
+      <div id="summary"></div>
+      <pre id="log"></pre>
+    </div>
+
+  </div>
+</body>
+</html>
