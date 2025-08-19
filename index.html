@@ -24,6 +24,11 @@
     overflow: hidden;
     touch-action: none;
   }
+.frame, .frame *{
+  -webkit-user-select: none;  /* iOS Safari */
+  user-select: none;
+  -webkit-touch-callout: none; /* disable Copy/Look Up bubble */
+}
 
   .scene,.targets,.ship-wrap,#startOverlay,#bigRetry,#successOverlay,#overlay{position:absolute; z-index:5}
   .bar{display:none}
@@ -334,6 +339,11 @@ const frameEl   = $("#frame"),
       leftBox   = $("#leftBox"),
       rightBox  = $("#rightBox");
 
+/* Block any selection/callout/drag inside the frame */
+frameEl.addEventListener("selectstart",  e => e.preventDefault());  // stop text/object selection
+frameEl.addEventListener("contextmenu",  e => e.preventDefault());  // stop long-press menu
+frameEl.addEventListener("dragstart",    e => e.preventDefault());  // stop drag ghost on images
+
 const attemptEl = $("#attempt"),
       timerEl   = $("#timer"),
       scoreEl   = $("#score"),
@@ -360,9 +370,7 @@ const hudTop   = $("#hudTop");
 const hudTimer = $("#hudTimer");
 const hudTries = $("#hudTries");
 const sessionFill = $("#sessionFill");
-const sessionWrap = $("#sessionWrap");  /* for pinned progress bar */shipBtn.addEventListener("contextmenu", e => e.preventDefault());  // no long-press menu
-shipBtn.addEventListener("dragstart",  e => e.preventDefault());   // no drag ghost
-shipBtn.addEventListener("selectstart",e => e.preventDefault());   // no text/object selection
+const sessionWrap = $("#sessionWrap");  /* for pinned progress bar */
 
 /* =============================
    UI helpers
