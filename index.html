@@ -113,23 +113,43 @@
   /* ===== Ship ===== */
   .ship-wrap{ left:0; right:0; bottom:25%; height:90px; z-index:8 }
   #shipBtn{
-    position:absolute;
-    left:50%; transform:translateX(-50%);
-    bottom:0; pointer-events:auto; touch-action:none; user-select:none; cursor:pointer;
-    background:transparent; border:0; padding:0; width:96px; height:96px;
-    will-change:left;
-    /* --- FIX 2: block iOS callout/selection on long press --- */
-    -webkit-touch-callout:none;
-  }
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  bottom:0;
+
+  /* disabled until gameplay enables it */
+  pointer-events:none;
+
+  /* harden against selection/callout even when enabled */
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+  -webkit-touch-callout:none;
+  -webkit-tap-highlight-color:transparent;
+
+  background:transparent;
+  border:0;
+  padding:0;
+  width:96px;
+  height:96px;
+  will-change:left;
+  cursor:pointer;
+}
   #shipBtn img{
-  width:100%; height:100%; object-fit:contain; display:block;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  display:block;
   filter:drop-shadow(0 8px 14px rgba(36,94,121,.18));
 
-  pointer-events:none;             /* events go to the button, not image */
-  -webkit-user-drag:none;          /* stop drag ghost */
-  -webkit-touch-callout:none;      /* stop save/share image */
+  /* don’t let the image itself grab input */
+  pointer-events:none;
+  -webkit-user-drag:none;
+  -webkit-touch-callout:none;
   user-select:none;
 }
+
   #shipBtn:active img{transform:translateY(1px) scale(.995)}
 
   /* ===== Hearts ===== */
@@ -364,6 +384,9 @@ const overlay   = $("#overlay"),
       startOverlay = $("#startOverlay"),
       startBtn = $("#startBtn"),
       shipBtn = $("#shipBtn");
+shipBtn.addEventListener("selectstart", e => e.preventDefault());  // stop highlight
+shipBtn.addEventListener("contextmenu", e => e.preventDefault());  // stop long-press menu
+shipBtn.addEventListener("dragstart",   e => e.preventDefault());  // stop drag ghost
 
 /* HUD */
 const hudTop   = $("#hudTop");
