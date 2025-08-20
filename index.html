@@ -97,17 +97,63 @@
   @keyframes targetRipple {from{box-shadow:0 0 0 0 rgba(115,177,199,.28)} to{box-shadow:0 0 0 12px rgba(115,177,199,0)}}
   .target.ripple{animation: targetRipple 320ms ease-out}
 
-  /* ===== Start overlay ===== */
+  /* ===== Start/Home overlay ===== */
   #startOverlay{
     inset:0; display:flex; align-items:center; justify-content:center;
     background:rgba(255,255,255,.10); z-index:100;
     pointer-events:auto;
   }
+  .homeCard{
+    width:min(720px,92vw);
+    background:#ffffffcc;
+    border:1px dashed #7FB5C9;
+    border-radius:16px;
+    box-shadow:0 14px 36px rgba(0,0,0,.14);
+    color:#1F4F66;
+    backdrop-filter: blur(3px);
+  }
+  .homeHeader{
+    padding:14px 16px 8px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .homeTitle{
+    margin:0; font-weight:900; letter-spacing:.2px;
+    font-size: clamp(18px,4.5vw,24px);
+  }
+  .homeNav{
+    display:flex; gap:8px; padding:0 16px 8px;
+    flex-wrap:wrap;
+  }
+  .tabBtn{
+    border:1px solid #73B1C7; background:#fff; color:#1F4F66;
+    font-weight:800; padding:8px 12px; border-radius:999px; cursor:pointer;
+  }
+  .tabBtn.active{ background:#E9F4F8 }
+  .homeBody{ padding:0 16px 12px }
+  .homeSec{ display:block }
+  .homeSec.hidden{ display:none }
+  .homeActions{
+    padding:12px 16px 16px; display:flex; gap:8px; justify-content:flex-end;
+  }
+
+  .scoreList{
+    margin:8px 0 0; padding:0; list-style:none;
+    max-height:min(40vh,300px); overflow:auto;
+    border:1px solid rgba(115,177,199,.35); border-radius:10px;
+  }
+  .scoreList li{
+    padding:8px 10px; display:flex; justify-content:space-between; align-items:center;
+    border-bottom:1px dashed rgba(115,177,199,.25);
+    font-size:14px;
+  }
+  .scoreList li:last-child{ border-bottom:0 }
+
   .btn{
     border:1px solid #73B1C7; background:#fff; color:#1F4F66;
     font-weight:800; padding:12px 24px; border-radius:12px; cursor:pointer;
     box-shadow:0 10px 24px rgba(0,0,0,.12);
   }
+  .btnSmall{ padding:6px 10px; font-size:12px; border-radius:10px }
 
   /* ===== Ship ===== */
   .ship-wrap{ left:0; right:0; bottom:25%; height:90px; z-index:8 }
@@ -142,6 +188,12 @@
     user-select:none;
   }
   #shipBtn:active img{transform:translateY(1px) scale(.995)}
+
+  /* ===== Tiny Home button during play ===== */
+  #homeBtn{
+    position:absolute; top:10px; left:10px; z-index:120;
+    display:none;
+  }
 
   /* ===== Hearts ===== */
   .heart{position:absolute; left:0; top:0; transform:translate(-50%,-50%); font-size:18px; pointer-events:none; user-select:none; z-index:999}
@@ -180,7 +232,6 @@
     pointer-events:none;
     transition: opacity .15s ease;
   }
-  /* We hide the old combined score text; we pin Score/Hi at artwork labels */
   .hudScore{ display:none }
 
   .hudTimer{
@@ -229,12 +280,11 @@
   }
   #scoreVal, #hiVal{
     position:absolute;
-    font-size: clamp(16px, 4.5vw, 22px); /* visually compatible with the art */
+    font-size: clamp(16px, 4.5vw, 22px);
     line-height:1;
     letter-spacing:.5px;
     text-shadow:0 2px 8px rgba(31,79,102,.12);
   }
-  /* anchor HI by its right edge using a translate, so we can set a left px */
   #hiVal{ transform:translateX(-100%) }
 </style>
 
@@ -251,8 +301,8 @@ const ATTEMPT_SECONDS   = 10;
 const RETRY_OVERLAY_MS  = 1200;
 const FIRST_DELAY_MS    = 3000;
 
-/* NEW: require a few letter-heart hits (tokens) to win */
-const LETTER_HITS_TO_WIN = 3;    // "slightly more" tokens; adjust to 3 if desired
+/* Require a few letter-heart hits (tokens) to win (unchanged request) */
+const LETTER_HITS_TO_WIN = 3;
 
 /* ===== Scoring constants (unchanged) ===== */
 const MAX_SCORE_ATT1 = 100;
@@ -265,6 +315,7 @@ const RT_SPREAD_S    = 3.0;
    HELPERS
 ============================= */
 const $ = (s)=>document.querySelector(s);
+const $$ = (s)=>document.querySelectorAll(s);
 const shuffle = (a)=>{ const x=a.slice(); for(let i=x.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [x[i],x[j]]=[x[j],x[i]];} return x; };
 const lettersOnly = /[A-Za-zÀ-ÖØ-öø-ÿ]/;
 
@@ -317,8 +368,35 @@ function makeReinforcementLine(s,positive){
   return `the reason ${phrase} was ${positive}.`;
 }
 
+/* ====== Non-word generator (same length, different missing index) ====== */
+function isLetter(ch){ return lettersOnly.test(ch); }
+function genNonWordLike(template, forbiddenIndex){
+  const chars = template.split("");
+  const letterIdxs = [];
+  for (let i=0;i<chars.length;i++){ if (isLetter(chars[i])) letterIdxs.push(i); }
+  if (!letterIdxs.length){
+    return { masked: "_", index: 0 };
+  }
+  // pick a mask index different from the positive's missing index
+  let maskIndex = letterIdxs[Math.floor(Math.random()*letterIdxs.length)];
+  if (maskIndex === forbiddenIndex){
+    const alt = letterIdxs.filter(i=>i!==forbiddenIndex);
+    maskIndex = alt[Math.floor(Math.random()*alt.length)];
+  }
+  const vowels = "aeiou";
+  const consonants = "bcdfghjklmnpqrstvwxyz";
+  const out = chars.map((ch,i)=>{
+    if (!isLetter(ch)) return ch;
+    const pool = vowels.includes(ch.toLowerCase()) ? vowels : consonants;
+    let r = pool[Math.floor(Math.random()*pool.length)];
+    if (ch === ch.toUpperCase()) r = r.toUpperCase();
+    return (i===maskIndex) ? "_" : r;
+  }).join("");
+  return { masked: out, index: maskIndex };
+}
+
 /* =============================
-   SCENARIOS (unchanged)
+   SCENARIOS (unchanged content)
 ============================= */
 const SCENARIOS=[{"id":"S01","scenario":"After emails, your partner rubs their eyes and squints at the screen; you tell yourself it’s ______.","positive":"eye strain","negative":"migraine onset"},
 {"id":"S02","scenario":"On a chilly walk, they cough a few times and clear their throat; maybe it’s ______.","positive":"dry air","negative":"chest cold"},
@@ -370,7 +448,7 @@ let firstDelayTO = null;
 /* token to invalidate hearts from previous trials */
 let currentTrialToken = 0;
 
-/* NEW: count how many letter-hearts have landed on the correct target this attempt */
+/* count how many letter-hearts have landed on the correct target this attempt */
 let letterHits = 0;
 
 /* ===== scoring state ===== */
@@ -410,13 +488,60 @@ const overlay   = $("#overlay"),
       restartSessionBtn = $("#restartSessionBtn"),
       startOverlay = $("#startOverlay"),
       startBtn = $("#startBtn"),
-      shipBtn = $("#shipBtn");
+      shipBtn = $("#shipBtn"),
+      homeBtn = $("#homeBtn");
+
 shipBtn.addEventListener("selectstart", e => e.preventDefault());
 shipBtn.addEventListener("contextmenu", e => e.preventDefault());
 shipBtn.addEventListener("dragstart",   e => e.preventDefault());
 
 const sessionFill = $("#sessionFill");
 const sessionWrap = $("#sessionWrap");
+
+/* Home overlay controls */
+const tabButtons = ()=>$$('.tabBtn');
+const showTab = (id)=>{
+  $$('.homeSec').forEach(sec => sec.classList.add('hidden'));
+  $('#'+id).classList.remove('hidden');
+  tabButtons().forEach(b=>b.classList.toggle('active', b.dataset.tab===id));
+};
+
+/* Score history storage */
+function getScoreHistory(){
+  try{ return JSON.parse(localStorage.getItem('ib_scoreHistory')||'[]'); }catch(e){ return []; }
+}
+function setScoreHistory(arr){
+  try{ localStorage.setItem('ib_scoreHistory', JSON.stringify(arr)); }catch(e){}
+}
+function addScoreHistory(score){
+  const hist = getScoreHistory();
+  hist.push({score, ts: Date.now()});
+  hist.sort((a,b)=> (b.score - a.score) || (b.ts - a.ts));
+  setScoreHistory(hist.slice(0,200));
+}
+function renderHomeScores(){
+  const list = $("#scoreList");
+  const hi = getHiScore();
+  const hist = getScoreHistory();
+  $("#homeHiVal").textContent = String(hi);
+  list.innerHTML = "";
+  if (!hist.length){
+    const li = document.createElement('li');
+    li.textContent = "No scores yet. Play a session to see results here.";
+    list.appendChild(li);
+    return;
+  }
+  hist.forEach((h,i)=>{
+    const d = new Date(h.ts);
+    const li = document.createElement('li');
+    const left = document.createElement('span');
+    left.textContent = `${String(i+1).padStart(2,'0')}. ${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+    const right = document.createElement('strong');
+    right.textContent = h.score;
+    li.appendChild(left); li.appendChild(right);
+    list.appendChild(li);
+  });
+}
 
 /* =============================
    UI helpers
@@ -438,9 +563,9 @@ function clearHearts(){
 }
 
 /* ===== ART METRICS & PINNING ===== */
-const PB_LEFT  = 0.08;  // session bar left %
-const PB_WIDTH = 0.84;   // session bar width %
-const PB_TOP   = 0.912;  // session bar vertical %
+const PB_LEFT  = 0.08;
+const PB_WIDTH = 0.84;
+const PB_TOP   = 0.912;
 
 /* numeric SCORE/HI positions (under artwork labels) */
 const SCORE_LEFT_PCT = 0.131;
@@ -579,9 +704,13 @@ function showTrial(sc){
 
   missing=obfuscateOneLetter(sc.positive);
   const posHTML=`[ ${decorateMasked(missing.masked)} ]`;
-  const blankHTML="[ — — ]";
-  leftBox.innerHTML  = posOnLeft ? posHTML : blankHTML;
-  rightBox.innerHTML = posOnLeft ? blankHTML : posHTML;
+
+  /* New: create a non-word alternative with a different missing index */
+  const nonw = genNonWordLike(sc.positive, missing.index);
+  const nonHTML = `[ ${decorateMasked(nonw.masked)} ]`;
+
+  leftBox.innerHTML  = posOnLeft ? posHTML : nonHTML;
+  rightBox.innerHTML = posOnLeft ? nonHTML : posHTML;
 
   fitTargetsToOneLine();
   startAttempt(true);
@@ -604,6 +733,8 @@ function nextTrial(){
       setHiScore(newHi);
       isNewHi = true;
     }
+    addScoreHistory(totalScore); // store in history
+
     ovTitle.textContent = "Session Complete";
     ovMsg.innerHTML = `Well done! You’ve finished all scenarios in this session.<br><br><strong>Score:</strong> ${totalScore}${isNewHi ? ' <span style="color:#1F4F66; font-weight:900">— New High!</span>' : ''}<br><small>High score: ${newHi}</small>`;
     overlay.style.display = "flex";
@@ -612,6 +743,9 @@ function nextTrial(){
       restartSessionBtn.style.display = "inline-flex";
       restartSessionBtn.textContent = "Play Again";
     }
+    // Show Home button on completion overlay
+    const homeBtn2 = $("#homeFromOverlay");
+    if (homeBtn2) homeBtn2.style.display = "inline-flex";
     return;
   }
   showTrial(SCENARIOS[order[idx]]);
@@ -669,7 +803,7 @@ function startLetterTimer(){
       emitHeart(currentSide, true);
       if (navigator.vibrate){ try{ navigator.vibrate(12); }catch(e){} }
     }
-  }, LETTER_INTERVAL_MS); // 360ms (unchanged)
+  }, LETTER_INTERVAL_MS);
 }
 function stopFiring(){
   firing = false;
@@ -725,7 +859,6 @@ function emitHeart(side,isLetter){
       setTimeout(()=>targetEl.classList.remove("goodflash","badflash"),260);
 
       if (good && isLetter){
-        // NEW: require a few letter-heart hits to complete
         letterHits += 1;
         if (letterHits >= LETTER_HITS_TO_WIN){
           onCorrect();
@@ -767,6 +900,8 @@ function registerFailAttempt(kind){
         restartSessionBtn.style.display = "inline-flex";
         restartSessionBtn.textContent = "Restart Session";
       }
+      const homeBtn2 = $("#homeFromOverlay");
+      if (homeBtn2) homeBtn2.style.display = "inline-flex";
       return;
     } else {
       bigRetryMsg.textContent = "Time is over, lets try again.";
@@ -852,8 +987,24 @@ function updateProgress(){
 }
 
 /* =============================
-   INIT & BUTTONS
+   HOME / INIT / BUTTONS
 ============================= */
+function goHome(){
+  // return to Home without altering the UI skin elsewhere
+  clearInterval(timerId);
+  stopFiring();
+  trialActive = false;
+  enableShipControls(false);
+  clearTimeout(firstDelayTO);
+  clearHearts();
+  homeBtn.style.display = "none";
+  startOverlay.style.display = "flex";
+  showTab("aboutTab");
+  renderHomeScores();
+  // keep current hi score visible
+  updateScoreHUD();
+}
+
 function init(){
   order = shuffle(SCENARIOS.map((_,i)=>i));
   idx=0; trialActive=false; attempts=0;
@@ -875,6 +1026,9 @@ function init(){
   targetsEl.style.visibility = "visible";
   stopFiring(); enableShipControls(false);
   startOverlay.style.display="flex";
+  homeBtn.style.display = "none";
+  renderHomeScores();
+  showTab("aboutTab");
   updateProgress();
 
   pinSessionBar();
@@ -882,18 +1036,28 @@ function init(){
   fitTargetsToOneLine();
 }
 
+/* Start button */
 startBtn.addEventListener("click", ()=>{
   startOverlay.style.display="none";
+  homeBtn.style.display = "inline-flex";
   nextTrial();
 });
 
-frameEl.addEventListener("click", ()=>{
-  if (startOverlay.style.display!=="none"){
+/* Only start if background of overlay itself is clicked (not card/buttons) */
+startOverlay.addEventListener("click", (e)=>{
+  if (e.target === startOverlay){
     startOverlay.style.display="none";
+    homeBtn.style.display = "inline-flex";
     nextTrial();
   }
 });
 
+/* In-game Home button */
+homeBtn.addEventListener("click", ()=>{
+  goHome();
+});
+
+/* Continue after correct */
 continueBtn.addEventListener("click", ()=>{
   successOverlay.style.display="none";
   idx += 1;
@@ -901,14 +1065,29 @@ continueBtn.addEventListener("click", ()=>{
   nextTrial();
 });
 
-retryScenarioBtn && retryScenarioBtn.addEventListener("click", ()=>{});
+/* Session restart / play again */
 restartSessionBtn && restartSessionBtn.addEventListener("click", ()=>{
+  overlay.style.display="none";
   idx=0;
   init();
 });
 
-window.addEventListener("resize", fitTargetsToOneLine);
-window.addEventListener("orientationchange", fitTargetsToOneLine);
+/* Overlay Home buttons */
+$("#homeFromOverlay")?.addEventListener("click", ()=>{
+  overlay.style.display="none";
+  goHome();
+});
+$("#homeFromSuccess")?.addEventListener("click", ()=>{
+  successOverlay.style.display="none";
+  goHome();
+});
+
+/* Tabs */
+document.addEventListener("click",(e)=>{
+  const btn = e.target.closest(".tabBtn");
+  if (!btn) return;
+  showTab(btn.dataset.tab);
+});
 
 /* boot */
 init();
@@ -919,8 +1098,53 @@ init();
 <body>
   <div class="frame" id="frame">
 
+    <!-- In-game tiny Home button -->
+    <button id="homeBtn" class="btn btnSmall">Home</button>
+
+    <!-- Home / Start overlay -->
     <div id="startOverlay">
-      <button id="startBtn" class="btn">Start</button>
+      <div class="homeCard" role="dialog" aria-modal="true">
+        <div class="homeHeader">
+          <h1 class="homeTitle">CBM-I Clinical Sky</h1>
+          <div style="font-weight:800; opacity:.8">HI: <span id="homeHiVal">0</span></div>
+        </div>
+        <div class="homeNav">
+          <button class="tabBtn active" data-tab="aboutTab">About</button>
+          <button class="tabBtn" data-tab="scoresTab">Scores</button>
+          <button class="tabBtn" data-tab="copyrightTab">Copyright</button>
+        </div>
+        <div class="homeBody">
+          <section id="aboutTab" class="homeSec">
+            <p style="margin:.25rem 0 .5rem">
+              This training helps partner-caregivers practice choosing <strong>benign</strong> interpretations of ambiguous, health-related situations. Each scenario appears with two response chips. One contains the <em>positive resolution</em> with one letter missing. The other shows a <em>non-word</em> of similar length with a different missing-letter position.
+            </p>
+            <ul style="margin:.25rem 0 .5rem; padding-left:1.1rem">
+              <li><strong>How to play:</strong> Hold the ship, aim toward the correct (benign) option, and keep it aligned. Your ship fires hearts; some deliver the missing letter. After a few letter-hits, the correct word resolves.</li>
+              <li><strong>Timing:</strong> You get three attempts per scenario (10s each). If all three time out, the session restarts from the beginning.</li>
+              <li><strong>Scoring:</strong> Faster resolution and earlier attempts earn more points. Your high score is saved locally on this device.</li>
+              <li><strong>Background:</strong> This follows CBM-I (Cognitive Bias Modification for Interpretation) principles—repeated selection of benign meanings can reduce negative interpretation bias over time.</li>
+            </ul>
+          </section>
+
+          <section id="scoresTab" class="homeSec hidden">
+            <p style="margin:.25rem 0 .5rem">Your previous session scores on this device (highest first):</p>
+            <ul id="scoreList" class="scoreList"></ul>
+          </section>
+
+          <section id="copyrightTab" class="homeSec hidden">
+            <p style="margin:.25rem 0 .5rem">
+              © 2025 <strong>Pouyan Alizadeh</strong>. All rights reserved.<br>
+              All <em>code, graphics, and any audio</em> in this application are designed and produced by the author and are protected by copyright law. Unauthorized copying, distribution, or derivative use is prohibited without written permission.
+            </p>
+            <p style="margin:.25rem 0 .5rem">
+              This training is for educational and wellness purposes and does not provide medical advice or diagnosis.
+            </p>
+          </section>
+        </div>
+        <div class="homeActions">
+          <button id="startBtn" class="btn">Play</button>
+        </div>
+      </div>
     </div>
 
     <!-- Top center HUD (timer + tries only) -->
@@ -963,7 +1187,10 @@ init();
       <div class="panel">
         <h2 style="margin:0 0 6px">Nice!</h2>
         <p id="successMsg" style="margin:6px 0 12px">the reason your partner … was …</p>
-        <button id="continueBtn" class="btn" style="padding:8px 14px">Continue</button>
+        <div style="display:flex; gap:8px; justify-content:center; margin-top:4px;">
+          <button id="continueBtn" class="btn" style="padding:8px 14px">Continue</button>
+          <button id="homeFromSuccess" class="btn" style="padding:8px 14px">Home</button>
+        </div>
       </div>
     </div>
 
@@ -974,6 +1201,7 @@ init();
         <div style="display:flex; gap:8px; justify-content:center; margin-top:8px;">
           <button id="retryScenarioBtn" class="btn" style="padding:8px 12px">Play This Scenario Again</button>
           <button id="restartSessionBtn" class="btn" style="padding:8px 12px">Restart Session</button>
+          <button id="homeFromOverlay" class="btn" style="padding:8px 12px; display:none;">Home</button>
         </div>
       </div>
     </div>
