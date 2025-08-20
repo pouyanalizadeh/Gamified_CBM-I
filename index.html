@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>IB Training — Visual Skin</title>
 
 <style>
@@ -14,8 +14,7 @@
   .frame{
     position: relative;
     width: 100vw;
-    height: 100dvh;
-
+    height: calc(var(--vh, 1vh) * 100); /* Reliable full height on mobile */
     /* Size of the ART itself, preserving the PNG’s 9:19.5 ratio */
     --artW: min(100vw, calc(100dvh * 9 / 19.5));
     --artH: min(100dvh, calc(100vw * (19.5 / 9)));
@@ -103,6 +102,11 @@
     background:rgba(255,255,255,.10); z-index:100;
     pointer-events:auto;
   }
+  /* Ensure overlays fill the real viewport height on phones */
+  #startOverlay, #successOverlay, #overlay, #bigRetry{
+    min-height: calc(var(--vh, 1vh) * 100);
+  }
+
   .homeCard{
     width:min(720px,92vw);
     background:#ffffffcc;
@@ -111,6 +115,8 @@
     box-shadow:0 14px 36px rgba(0,0,0,.14);
     color:#1F4F66;
     backdrop-filter: blur(3px);
+    max-height: calc(var(--vh, 1vh) * 100 - 32px); /* keep fully visible on short phones */
+    overflow: auto;
   }
   .homeHeader{
     padding:14px 16px 8px;
@@ -189,10 +195,10 @@
   }
   #shipBtn:active img{transform:translateY(1px) scale(.995)}
 
-  /* ===== Tiny Home button during play ===== */
+  /* ===== Tiny Home button during play (pinned via JS) ===== */
   #homeBtn{
-    position:absolute; top:10px; left:10px; z-index:120;
-    display:none;
+    position:absolute; z-index:120; display:none;
+    /* top/left set by JS to keep it inside the artwork */
   }
 
   /* ===== Hearts ===== */
@@ -310,6 +316,17 @@ const MAX_SCORE_ATT2 = 70;
 const MAX_SCORE_ATT3 = 40;
 const OPTIMAL_RT_S   = 3.0;
 const RT_SPREAD_S    = 3.0;
+
+/* =============================
+   VIEWPORT HEIGHT VARIABLE
+============================= */
+function setVH(){
+  const vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty('--vh', `${vh}px`);
+}
+setVH();
+window.addEventListener('resize', setVH);
+window.addEventListener('orientationchange', setVH);
 
 /* =============================
    HELPERS
@@ -618,6 +635,20 @@ function pinScoreHi(){
   hiValEl.style.top  = (hTop  - fr.top)  + "px";
 }
 
+/* Place the Home button inside the artwork, away from SCORE/HI */
+const HOMEBTN_LEFT_PCT = 0.03; // 3% from art’s left edge
+const HOMEBTN_TOP_PCT  = 0.03; // 3% from art’s top edge
+function pinHomeBtn(){
+  const fr = frameEl.getBoundingClientRect();
+  const { artW, artH, artLeft, artTop } = _computeArtRect();
+
+  const leftPx = fr.left + artLeft + artW * HOMEBTN_LEFT_PCT;
+  const topPx  = fr.top  + artTop  + artH * HOMEBTN_TOP_PCT;
+
+  homeBtn.style.left = (leftPx - fr.left) + "px";
+  homeBtn.style.top  = (topPx  - fr.top ) + "px";
+}
+
 const _bg = new Image();
 _bg.src = "Main_frame.png";
 _bg.onload = () => {
@@ -625,9 +656,10 @@ _bg.onload = () => {
   _artNat.h = _bg.naturalHeight;
   pinSessionBar();
   pinScoreHi();
+  pinHomeBtn();
 };
-window.addEventListener("resize", ()=>{ pinSessionBar(); pinScoreHi(); });
-window.addEventListener("orientationchange", ()=>{ pinSessionBar(); pinScoreHi(); });
+window.addEventListener("resize", ()=>{ pinSessionBar(); pinScoreHi(); pinHomeBtn(); setVH(); });
+window.addEventListener("orientationchange", ()=>{ pinSessionBar(); pinScoreHi(); pinHomeBtn(); setVH(); });
 
 /* =============================
    TIMER
@@ -1033,13 +1065,25 @@ function init(){
 
   pinSessionBar();
   pinScoreHi();
+  pinHomeBtn();
   fitTargetsToOneLine();
 }
 
 /* Start button */
-startBtn.addEventListener("click", ()=>{
+startBtn.addEventListener("click", async ()=>{
+  // Try to enter fullscreen where supported
+  const el = document.documentElement;
+  try{
+    if (el.requestFullscreen) {
+      await el.requestFullscreen();
+    } else if (el.webkitRequestFullscreen) { // Safari fallback
+      el.webkitRequestFullscreen();
+    }
+  }catch(e){ /* ignore if denied */ }
+
   startOverlay.style.display="none";
   homeBtn.style.display = "inline-flex";
+  pinHomeBtn();      // ensure correct in-art placement on start
   nextTrial();
 });
 
