@@ -24,11 +24,11 @@
     overflow: hidden;
     touch-action: none;
   }
-.frame, .frame *{
-  -webkit-user-select: none;  /* iOS Safari */
-  user-select: none;
-  -webkit-touch-callout: none; /* disable Copy/Look Up bubble */
-}
+  .frame, .frame *{
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
 
   .scene,.targets,.ship-wrap,#startOverlay,#bigRetry,#successOverlay,#overlay{position:absolute; z-index:5}
   .bar{display:none}
@@ -64,7 +64,6 @@
     filter:drop-shadow(0 6px 10px rgba(36,94,121,.08));
     font-size: clamp(13px, 2.3vw, 16px);
     transition: transform .18s ease, filter .18s ease, box-shadow .18s ease;
-    /* --- FIX 1: keep chips to one line and let JS shrink if needed --- */
     white-space: nowrap;
     overflow: hidden;
   }
@@ -113,43 +112,35 @@
   /* ===== Ship ===== */
   .ship-wrap{ left:0; right:0; bottom:25%; height:90px; z-index:8 }
   #shipBtn{
-  position:absolute;
-  left:50%;
-  transform:translateX(-50%);
-  bottom:0;
-
-  /* disabled until gameplay enables it */
-  pointer-events:none;
-
-  /* harden against selection/callout even when enabled */
-  touch-action:none;
-  user-select:none;
-  -webkit-user-select:none;
-  -webkit-touch-callout:none;
-  -webkit-tap-highlight-color:transparent;
-
-  background:transparent;
-  border:0;
-  padding:0;
-  width:96px;
-  height:96px;
-  will-change:left;
-  cursor:pointer;
-}
+    position:absolute;
+    left:50%;
+    transform:translateX(-50%);
+    bottom:0;
+    pointer-events:none;
+    touch-action:none;
+    user-select:none;
+    -webkit-user-select:none;
+    -webkit-touch-callout:none;
+    -webkit-tap-highlight-color:transparent;
+    background:transparent;
+    border:0;
+    padding:0;
+    width:96px;
+    height:96px;
+    will-change:left;
+    cursor:pointer;
+  }
   #shipBtn img{
-  width:100%;
-  height:100%;
-  object-fit:contain;
-  display:block;
-  filter:drop-shadow(0 8px 14px rgba(36,94,121,.18));
-
-  /* don’t let the image itself grab input */
-  pointer-events:none;
-  -webkit-user-drag:none;
-  -webkit-touch-callout:none;
-  user-select:none;
-}
-
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:block;
+    filter:drop-shadow(0 8px 14px rgba(36,94,121,.18));
+    pointer-events:none;
+    -webkit-user-drag:none;
+    -webkit-touch-callout:none;
+    user-select:none;
+  }
   #shipBtn:active img{transform:translateY(1px) scale(.995)}
 
   /* ===== Hearts ===== */
@@ -189,6 +180,9 @@
     pointer-events:none;
     transition: opacity .15s ease;
   }
+  /* We hide the old combined score text; we pin Score/Hi at artwork labels */
+  .hudScore{ display:none }
+
   .hudTimer{
     font-weight:900;
     font-size: clamp(24px, 6.5vw, 36px);
@@ -204,20 +198,19 @@
     opacity:.9;
   }
 
-  /* ===== Bottom Session Progress (precisely pinned to art) ===== */
+  /* ===== Pinned Session Progress (on artwork) ===== */
   .sessionWrap{
     position:absolute; z-index:30;
-    /* JS will set left/top/width in pixels */
     left:0; top:0;
-    width:300px;     /* harmless fallback until JS runs */
-    height:12px;     /* visual bar height */
+    width:300px;
+    height:19.75px;
     pointer-events:none;
   }
   .sessionBar{
     position:relative;
     width:100%; height:100%;
     border-radius:999px; overflow:hidden;
-    background: rgba(106,162,192,.22); /* track */
+    background: rgba(106,162,192,.22);
   }
   .sessionFill{
     position:absolute; left:0; top:0;
@@ -226,6 +219,23 @@
     background: linear-gradient(90deg, rgba(115,177,199,.85), rgba(106,162,192,1));
     transition: width .35s ease;
   }
+
+  /* ===== Pinned Score/Hi numbers under art labels ===== */
+  .scoreFixed{
+    position:absolute; z-index:35; inset:0;
+    pointer-events:none;
+    font-weight:900;
+    color:#1F4F66;
+  }
+  #scoreVal, #hiVal{
+    position:absolute;
+    font-size: clamp(16px, 4.5vw, 22px); /* visually compatible with the art */
+    line-height:1;
+    letter-spacing:.5px;
+    text-shadow:0 2px 8px rgba(31,79,102,.12);
+  }
+  /* anchor HI by its right edge using a translate, so we can set a left px */
+  #hiVal{ transform:translateX(-100%) }
 </style>
 
 <script defer>
@@ -233,13 +243,23 @@ window.addEventListener('DOMContentLoaded', () => {
 /* =============================
    CONSTANTS
 ============================= */
-const HEART_INTERVAL_MS = 700;
-const LETTER_INTERVAL_MS = 360;
-const HEART_SPEED_MS    = 420;
-const LETTER_SPEED_MS   = 1100;
+const HEART_INTERVAL_MS = 700;   // unchanged
+const LETTER_INTERVAL_MS = 360;  // unchanged
+const HEART_SPEED_MS    = 420;   // unchanged
+const LETTER_SPEED_MS   = 1100;  // unchanged
 const ATTEMPT_SECONDS   = 10;
 const RETRY_OVERLAY_MS  = 1200;
 const FIRST_DELAY_MS    = 3000;
+
+/* NEW: require a few letter-heart hits (tokens) to win */
+const LETTER_HITS_TO_WIN = 3;    // "slightly more" tokens; adjust to 3 if desired
+
+/* ===== Scoring constants (unchanged) ===== */
+const MAX_SCORE_ATT1 = 100;
+const MAX_SCORE_ATT2 = 70;
+const MAX_SCORE_ATT3 = 40;
+const OPTIMAL_RT_S   = 3.0;
+const RT_SPREAD_S    = 3.0;
 
 /* =============================
    HELPERS
@@ -261,13 +281,12 @@ function fitTextTo(el, minPx=12, step=1){
   }
 }
 
-/* --- FIX 1 helper: shrink chip text until it fits one line --- */
+/* Keep target chips on one line by shrinking gently */
 function fitToOneLine(el, minPx=11, step=0.5){
-  el.style.fontSize = "";                 // reset to CSS-defined size
+  el.style.fontSize = "";
   const cs = getComputedStyle(el);
   let size = parseFloat(cs.fontSize) || 16;
   const maxLoops = 40; let loops = 0;
-  // Keep to a single line; reduce size while overflowing horizontally
   while ((el.scrollWidth > el.clientWidth) && size > minPx && loops < maxLoops){
     size -= step;
     el.style.fontSize = size + "px";
@@ -299,10 +318,9 @@ function makeReinforcementLine(s,positive){
 }
 
 /* =============================
-   SCENARIOS
+   SCENARIOS (unchanged)
 ============================= */
-const SCENARIOS=[/* (unchanged 32 scenarios) */ 
-{"id":"S01","scenario":"After emails, your partner rubs their eyes and squints at the screen; you tell yourself it’s ______.","positive":"eye strain","negative":"migraine onset"},
+const SCENARIOS=[{"id":"S01","scenario":"After emails, your partner rubs their eyes and squints at the screen; you tell yourself it’s ______.","positive":"eye strain","negative":"migraine onset"},
 {"id":"S02","scenario":"On a chilly walk, they cough a few times and clear their throat; maybe it’s ______.","positive":"dry air","negative":"chest cold"},
 {"id":"S03","scenario":"Their smartwatch flags heart rate while resting; you think it’s ______.","positive":"device glitch","negative":"heart arrhythmia"},
 {"id":"S04","scenario":"A clinic voicemail asks for a call back without details; probably ______.","positive":"routine reminder","negative":"abnormal results"},
@@ -333,8 +351,7 @@ const SCENARIOS=[/* (unchanged 32 scenarios) */
 {"id":"S29","scenario":"At the store, they study food labels; you think ______.","positive":"budget planning","negative":"medical restriction"},
 {"id":"S30","scenario":"Standing up, they steady on the table for a moment; maybe ______.","positive":"gentle stretch","negative":"lightheaded spell"},
 {"id":"S31","scenario":"Your long text gets a quick “k”; probably ______.","positive":"busy multitasking","negative":"hidden irritation"},
-{"id":"S32","scenario":"Walking in dim light, they touch the wall; maybe ______.","positive":"casual stretch","negative":"balance trouble"}
-];
+{"id":"S32","scenario":"Walking in dim light, they touch the wall; maybe ______.","positive":"casual stretch","negative":"balance trouble"}];
 
 /* =============================
    STATE & ELEMENTS
@@ -350,25 +367,36 @@ let missing = { masked:"", missingChar:"", index:-1 };
 let firing = false, fireTimer = null, letterTimer = null, currentSide = "L";
 let firstDelayTO = null;
 
-/* NEW: token to invalidate hearts from previous trials */
+/* token to invalidate hearts from previous trials */
 let currentTrialToken = 0;
 
+/* NEW: count how many letter-hearts have landed on the correct target this attempt */
+let letterHits = 0;
+
+/* ===== scoring state ===== */
+let attemptStartMs = 0;
+let totalScore = 0;
+let hiScore   = 0;
+
+/* ===== Elements ===== */
 const frameEl   = $("#frame"),
       sceneEl   = $("#scene"),
       targetsEl = document.querySelector(".targets"),
       leftBox   = $("#leftBox"),
       rightBox  = $("#rightBox");
 
-/* Block any selection/callout/drag inside the frame */
-frameEl.addEventListener("selectstart",  e => e.preventDefault());  // stop text/object selection
-frameEl.addEventListener("contextmenu",  e => e.preventDefault());  // stop long-press menu
-frameEl.addEventListener("dragstart",    e => e.preventDefault());  // stop drag ghost on images
+frameEl.addEventListener("selectstart",  e => e.preventDefault());
+frameEl.addEventListener("contextmenu",  e => e.preventDefault());
+frameEl.addEventListener("dragstart",    e => e.preventDefault());
 
-const attemptEl = $("#attempt"),
-      timerEl   = $("#timer"),
-      scoreEl   = $("#score"),
-      trialIdxEl= $("#trialIdx"),
-      trialTotalEl=$("#trialTotal");
+const timerEl   = $("#timer"),
+      hudTop    = $("#hudTop"),
+      hudTimer  = $("#hudTimer"),
+      hudTries  = $("#hudTries");
+
+/* pinned score/hi */
+const scoreValEl = $("#scoreVal");
+const hiValEl    = $("#hiVal");
 
 const overlay   = $("#overlay"),
       ovTitle   = $("#ovTitle"),
@@ -378,22 +406,17 @@ const overlay   = $("#overlay"),
       successOverlay = $("#successOverlay"),
       successMsg = $("#successMsg"),
       continueBtn = $("#continueBtn"),
-      restartBtn  = $("#restartBtn"),
       retryScenarioBtn = $("#retryScenarioBtn"),
       restartSessionBtn = $("#restartSessionBtn"),
       startOverlay = $("#startOverlay"),
       startBtn = $("#startBtn"),
       shipBtn = $("#shipBtn");
-shipBtn.addEventListener("selectstart", e => e.preventDefault());  // stop highlight
-shipBtn.addEventListener("contextmenu", e => e.preventDefault());  // stop long-press menu
-shipBtn.addEventListener("dragstart",   e => e.preventDefault());  // stop drag ghost
+shipBtn.addEventListener("selectstart", e => e.preventDefault());
+shipBtn.addEventListener("contextmenu", e => e.preventDefault());
+shipBtn.addEventListener("dragstart",   e => e.preventDefault());
 
-/* HUD */
-const hudTop   = $("#hudTop");
-const hudTimer = $("#hudTimer");
-const hudTries = $("#hudTries");
 const sessionFill = $("#sessionFill");
-const sessionWrap = $("#sessionWrap");  /* for pinned progress bar */
+const sessionWrap = $("#sessionWrap");
 
 /* =============================
    UI helpers
@@ -414,22 +437,28 @@ function clearHearts(){
   document.querySelectorAll('.heart').forEach(h=>h.remove());
 }
 
-/* ===== ART METRICS & SESSION BAR PINNING (precise) ===== */
-const PB_LEFT  = 0.085;  // 8.5% of art width from the left
-const PB_WIDTH = 0.83;   // 83% of art width
-const PB_TOP   = 0.915;  // ~91.5% down from top (center of holder)
+/* ===== ART METRICS & PINNING ===== */
+const PB_LEFT  = 0.08;  // session bar left %
+const PB_WIDTH = 0.84;   // session bar width %
+const PB_TOP   = 0.912;  // session bar vertical %
+
+/* numeric SCORE/HI positions (under artwork labels) */
+const SCORE_LEFT_PCT = 0.131;
+const SCORE_TOP_PCT  = 0.08;
+const HI_RIGHT_PCT   = 0.05;
+const HI_TOP_PCT     = 0.08;
 
 let _artNat = { w: 0, h: 0 };
 
 function _computeArtRect(){
   const fr = frameEl.getBoundingClientRect();
-  const natW = _artNat.w || 900;   // safe fallback
+  const natW = _artNat.w || 900;
   const natH = _artNat.h || 1950;
   const scale = Math.min(fr.width / natW, fr.height / natH);
   const artW = natW * scale;
   const artH = natH * scale;
   const artLeft = (fr.width - artW) / 2;
-  const artTop  = 0; // background is center top
+  const artTop  = 0;
   return { artW, artH, artLeft, artTop };
 }
 
@@ -441,10 +470,27 @@ function pinSessionBar(){
   const pxLeft  = fr.left + artLeft + artW * PB_LEFT;
   const pxTop   = fr.top  + artTop  + artH * PB_TOP;
 
-  // convert to frame-local positioning
   sessionWrap.style.left  = (pxLeft - fr.left) + "px";
   sessionWrap.style.top   = (pxTop - fr.top - sessionWrap.offsetHeight/2) + "px";
   sessionWrap.style.width = (artW * PB_WIDTH) + "px";
+}
+
+/* pin score & hi numbers under the graphic labels */
+function pinScoreHi(){
+  const fr = frameEl.getBoundingClientRect();
+  const { artW, artH, artLeft, artTop } = _computeArtRect();
+
+  // SCORE (left anchored)
+  const sLeft = fr.left + artLeft + artW * SCORE_LEFT_PCT;
+  const sTop  = fr.top  + artTop  + artH * SCORE_TOP_PCT;
+  scoreValEl.style.left = (sLeft - fr.left) + "px";
+  scoreValEl.style.top  = (sTop - fr.top)  + "px";
+
+  // HI (right anchored using translateX(-100%))
+  const hLeft = fr.left + artLeft + artW * (1 - HI_RIGHT_PCT);
+  const hTop  = fr.top  + artTop  + artH * HI_TOP_PCT;
+  hiValEl.style.left = (hLeft - fr.left) + "px";
+  hiValEl.style.top  = (hTop  - fr.top)  + "px";
 }
 
 const _bg = new Image();
@@ -453,9 +499,10 @@ _bg.onload = () => {
   _artNat.w = _bg.naturalWidth;
   _artNat.h = _bg.naturalHeight;
   pinSessionBar();
+  pinScoreHi();
 };
-window.addEventListener("resize", pinSessionBar);
-window.addEventListener("orientationchange", pinSessionBar);
+window.addEventListener("resize", ()=>{ pinSessionBar(); pinScoreHi(); });
+window.addEventListener("orientationchange", ()=>{ pinSessionBar(); pinScoreHi(); });
 
 /* =============================
    TIMER
@@ -465,6 +512,7 @@ function startAnswerWindow(limit,onEnd){
   seconds = limit;
   timerEl && (timerEl.textContent = String(seconds));
   hudTimer && (hudTimer.textContent = String(seconds));
+  attemptStartMs = performance.now();
   timerId = setInterval(()=>{
     seconds -= 1;
     const s = String(Math.max(0,seconds));
@@ -483,7 +531,8 @@ function startAnswerWindow(limit,onEnd){
 function startAttempt(isFirst){
   stopFiring(); enableShipControls(false);
   clearInterval(timerId);
-  clearHearts(); // ensure a clean attempt (safety)
+  clearHearts();
+  letterHits = 0;  // reset required token count each attempt
 
   if (isFirst){
     targetsEl.style.visibility = "hidden";
@@ -496,7 +545,7 @@ function startAttempt(isFirst){
       hudTop.style.opacity = "1";
       startAnswerWindow(ATTEMPT_SECONDS,()=>registerFailAttempt("timeout"));
       enableShipControls(true);
-      fitTargetsToOneLine(); /* ensure chips fit when first shown */
+      fitTargetsToOneLine();
     }, FIRST_DELAY_MS);
   } else {
     targetsEl.style.visibility = "visible";
@@ -512,12 +561,10 @@ function startAttempt(isFirst){
    TRIAL FLOW
 ============================= */
 function showTrial(sc){
-  // NEW: move to a fresh trial token and purge any stray hearts
   currentTrialToken++;
   clearHearts();
 
   trialActive=true; attempts=0;
-  attemptEl && (attemptEl.textContent="0");
   hudTries && (hudTries.textContent = "0/3");
   sceneEl.style.fontSize = ""; sceneEl.style.lineHeight = "";
   sceneEl.innerHTML = sc.scenario.replace(";", ";<br>");
@@ -536,7 +583,7 @@ function showTrial(sc){
   leftBox.innerHTML  = posOnLeft ? posHTML : blankHTML;
   rightBox.innerHTML = posOnLeft ? blankHTML : posHTML;
 
-  fitTargetsToOneLine();  /* --- FIX 1: shrink to one line --- */
+  fitTargetsToOneLine();
   startAttempt(true);
   updateProgress();
 }
@@ -546,13 +593,25 @@ function nextTrial(){
   successOverlay.style.display="none";
   overlay.style.display="none";
   clearTimeout(firstDelayTO);
-  clearHearts(); // NEW: ensure no carry-over before moving on
+  clearHearts();
 
   if (idx >= order.length){
+    const prevHi = getHiScore();
+    let newHi = prevHi;
+    let isNewHi = false;
+    if (totalScore > prevHi){
+      newHi = totalScore;
+      setHiScore(newHi);
+      isNewHi = true;
+    }
     ovTitle.textContent = "Session Complete";
-    ovMsg.innerHTML = "Well done! You’ve finished all scenarios in this session.";
+    ovMsg.innerHTML = `Well done! You’ve finished all scenarios in this session.<br><br><strong>Score:</strong> ${totalScore}${isNewHi ? ' <span style="color:#1F4F66; font-weight:900">— New High!</span>' : ''}<br><small>High score: ${newHi}</small>`;
     overlay.style.display = "flex";
     retryScenarioBtn && (retryScenarioBtn.style.display = "none");
+    if (restartSessionBtn){
+      restartSessionBtn.style.display = "inline-flex";
+      restartSessionBtn.textContent = "Play Again";
+    }
     return;
   }
   showTrial(SCENARIOS[order[idx]]);
@@ -593,15 +652,14 @@ function onPointerUp(){
   window.removeEventListener("pointermove", onPointerMove);
 }
 
-/* --- FIX 2: block drag/callout/context menu on the ship --- */
 shipBtn.addEventListener("contextmenu", e => e.preventDefault());
 shipBtn.addEventListener("dragstart",  e => e.preventDefault());
 
 function startFiring(){
   if (firing || !trialActive || seconds <= 0) return;
   firing = true;
-  fireTimer   = setInterval(()=>emitHeart(currentSide,false), HEART_INTERVAL_MS);
-  startLetterTimer();
+  fireTimer = setInterval(()=>emitHeart(currentSide,false), HEART_INTERVAL_MS);
+  startLetterTimer();   // immediate (unchanged behavior)
 }
 function startLetterTimer(){
   if (letterTimer) return;
@@ -611,16 +669,16 @@ function startLetterTimer(){
       emitHeart(currentSide, true);
       if (navigator.vibrate){ try{ navigator.vibrate(12); }catch(e){} }
     }
-  }, LETTER_INTERVAL_MS);
+  }, LETTER_INTERVAL_MS); // 360ms (unchanged)
 }
 function stopFiring(){
-  firing=false;
-  clearInterval(fireTimer); fireTimer=null;
-  clearInterval(letterTimer); letterTimer=null;
+  firing = false;
+  clearInterval(fireTimer); fireTimer = null;
+  clearInterval(letterTimer); letterTimer = null;
 }
 function enableShipControls(on){
   shipBtn.style.opacity = on ? "1" : ".6";
-  shipBtn.style.pointerEvents = on ? "auto" : "none";   // <— NEW: hard-disable until enabled
+  shipBtn.style.pointerEvents = on ? "auto" : "none";
   if (on){
     shipBtn.addEventListener("pointerdown", onPointerDown);
   } else {
@@ -628,12 +686,10 @@ function enableShipControls(on){
   }
 }
 
-
 /* =============================
    HEARTS (projectiles)
 ============================= */
 function emitHeart(side,isLetter){
-  // NEW: capture the emitting trial
   const myToken = currentTrialToken;
 
   const fr=frameEl.getBoundingClientRect();
@@ -654,18 +710,14 @@ function emitHeart(side,isLetter){
   const dur=isLetter?LETTER_SPEED_MS:HEART_SPEED_MS;
   const t0=performance.now();
   function step(t){
-    // If trial changed mid-flight, discard this heart
     if (myToken !== currentTrialToken){ heart.remove(); return; }
-
     const p=Math.min(1,(t-t0)/dur);
     heart.style.left=(startX+(endX-startX)*p)+"px";
     heart.style.top =(startY+(endY-startY)*p)+"px";
     if(p<1){
       requestAnimationFrame(step);
     } else {
-      // Guard again at landing
       if(myToken !== currentTrialToken || !trialActive || seconds <= 0){ heart.remove(); return; }
-
       pulseRipple(targetEl);
       const good = targetEl.dataset.correct==="1";
       targetEl.classList.remove("goodflash","badflash");
@@ -673,7 +725,11 @@ function emitHeart(side,isLetter){
       setTimeout(()=>targetEl.classList.remove("goodflash","badflash"),260);
 
       if (good && isLetter){
-        onCorrect();
+        // NEW: require a few letter-heart hits to complete
+        letterHits += 1;
+        if (letterHits >= LETTER_HITS_TO_WIN){
+          onCorrect();
+        }
       }
       heart.remove();
     }
@@ -707,6 +763,10 @@ function registerFailAttempt(kind){
       ovTitle.textContent = "Session Restart Needed";
       ovMsg.innerHTML = `You need to start over from the beginning.`;
       retryScenarioBtn && (retryScenarioBtn.style.display = "none");
+      if (restartSessionBtn){
+        restartSessionBtn.style.display = "inline-flex";
+        restartSessionBtn.textContent = "Restart Session";
+      }
       return;
     } else {
       bigRetryMsg.textContent = "Time is over, lets try again.";
@@ -728,8 +788,7 @@ function onCorrect(){
   clearInterval(timerId);
   toggleShake(false);
   clearTimeout(firstDelayTO);
-
-  clearHearts(); // NEW: purge any in-flight hearts immediately
+  clearHearts();
 
   const sc=SCENARIOS[order[idx]];
   const posEl=(posSide==="L")?leftBox:rightBox;
@@ -741,11 +800,46 @@ function onCorrect(){
     .replace(/______/, sc.positive)
     .replace(";", ";<br>");
   fitTextTo(sceneEl);
+  fitToOneLine(posEl);
 
-  fitToOneLine(posEl); /* --- FIX 1: ensure revealed positive fits --- */
+  /* scoring */
+  const rtSec = Math.max(0, (performance.now() - attemptStartMs)/1000);
+  const attemptNumber = attempts + 1;
+  const gained = scoreAttempt(rtSec, attemptNumber);
+  totalScore += gained;
+  updateScoreHUD();
 
   successMsg.textContent = makeReinforcementLine(sc.scenario, sc.positive);
   successOverlay.style.display="flex";
+}
+
+/* ===== scoring functions ===== */
+function scoreAttempt(rtSec, attemptNumber){
+  if (attemptNumber === 1){
+    const norm = 1 - Math.pow((rtSec - OPTIMAL_RT_S)/RT_SPREAD_S, 2);
+    const pts = Math.max(0, Math.round(MAX_SCORE_ATT1 * Math.max(0, norm)));
+    return pts;
+  } else if (attemptNumber === 2){
+    const pts = Math.max(0, Math.round(MAX_SCORE_ATT2 * (1 - (rtSec / ATTEMPT_SECONDS))));
+    return pts;
+  } else {
+    const pts = Math.max(0, Math.round(MAX_SCORE_ATT3 * (1 - (rtSec / ATTEMPT_SECONDS))));
+    return pts;
+  }
+}
+function updateScoreHUD(){
+  if (scoreValEl) scoreValEl.textContent = String(totalScore);
+  if (hiValEl)    hiValEl.textContent    = String(getHiScore());
+}
+function getHiScore(){
+  if (typeof localStorage === "undefined") return hiScore;
+  const v = localStorage.getItem("ib_hiScore");
+  return v ? parseInt(v,10) : hiScore;
+}
+function setHiScore(v){
+  hiScore = v;
+  try{ localStorage.setItem("ib_hiScore", String(v)); }catch(e){}
+  updateScoreHUD();
 }
 
 /* =============================
@@ -764,8 +858,12 @@ function init(){
   order = shuffle(SCENARIOS.map((_,i)=>i));
   idx=0; trialActive=false; attempts=0;
   clearTimeout(firstDelayTO);
-  currentTrialToken++; // NEW: invalidate anything stale on init
+  currentTrialToken++;
   clearHearts();
+
+  totalScore = 0;
+  hiScore = getHiScore();
+  updateScoreHUD();
 
   sceneEl.textContent="Press “Start” to begin.";
   sceneEl.style.fontSize=""; sceneEl.style.lineHeight="";
@@ -779,7 +877,8 @@ function init(){
   startOverlay.style.display="flex";
   updateProgress();
 
-  pinSessionBar();  /* place bar on load */
+  pinSessionBar();
+  pinScoreHi();
   fitTargetsToOneLine();
 }
 
@@ -808,7 +907,6 @@ restartSessionBtn && restartSessionBtn.addEventListener("click", ()=>{
   init();
 });
 
-/* Keep chips fitting on rotate/resize */
 window.addEventListener("resize", fitTargetsToOneLine);
 window.addEventListener("orientationchange", fitTargetsToOneLine);
 
@@ -825,9 +923,17 @@ init();
       <button id="startBtn" class="btn">Start</button>
     </div>
 
+    <!-- Top center HUD (timer + tries only) -->
     <div class="hudTop" id="hudTop">
+      <div class="hudScore" id="hudScore"></div>
       <div class="hudTimer" id="hudTimer">10</div>
       <div class="hudTries" id="hudTries">0/3</div>
+    </div>
+
+    <!-- Numeric SCORE/HI pinned under the artwork labels -->
+    <div class="scoreFixed" aria-hidden="true">
+      <div id="scoreVal">0</div>
+      <div id="hiVal">0</div>
     </div>
 
     <div class="scene" id="scene">Press “Start” to begin.</div>
@@ -839,7 +945,7 @@ init();
 
     <button id="restartBtn" style="position:absolute; left:-9999px; top:-9999px;" disabled>Restart</button>
 
-    <div class="ship-wrap" id="shipWrap" style="z-index:6;">
+    <div class="ship-wrap" id="shipWrap" style="z-index:6%;">
       <button id="shipBtn" aria-label="Hold to fire hearts">
         <img src="Ship_to_shoot.png" alt="" draggable="false">
       </button>
